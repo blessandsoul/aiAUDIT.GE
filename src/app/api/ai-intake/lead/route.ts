@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { verifyState } from '@/lib/audit-session';
 
 import {
   buildIntakeLeadTelegramMessages,
@@ -18,8 +19,8 @@ const leadSchema = z.object({
   website: z.string().max(0).optional(),
   messages: z.array(z.object({
     role: z.enum(['assistant', 'user']),
-    content: z.string().trim().min(1).max(2_000),
-  })).min(2).max(32),
+    content: z.string().trim().min(1).max(20_000),
+  })).min(2).max(70),
   intakeState: z.unknown(),
 }).strict();
 
@@ -31,6 +32,7 @@ function getClientIp(request: NextRequest): string {
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
+  for (const [key, value] of submissionMap) if (value.resetAt < now) submissionMap.delete(key);
   const entry = submissionMap.get(ip);
   if (!entry || now > entry.resetAt) {
     submissionMap.set(ip, { count: 1, resetAt: now + WINDOW_MS });
@@ -41,12 +43,16 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
+  const origin = request.headers.get('origin');
+  if (origin && origin !== new URL(request.url).origin && origin !== process.env.NEXT_PUBLIC_SITE_URL) return NextResponse.json({ error: 'Origin rejected' }, { status: 403 });
   if (isRateLimited(getClientIp(request))) {
     return NextResponse.json({ error: 'Too many submissions.' }, { status: 429 });
   }
 
   try {
-    const parsed = leadSchema.safeParse(await request.json());
+    const body = await request.text();
+    if (Buffer.byteLength(body) > 350_000) return NextResponse.json({ error: 'Request too large.' }, { status: 413 });
+    const parsed = leadSchema.safeParse(JSON.parse(body));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid lead data.' }, { status: 400 });
     }
@@ -54,7 +60,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const phone = normaliseLeadPhone(parsed.data.phone);
     const hasUserAnswer = parsed.data.messages.some((message) => message.role === 'user');
-    if (!phone || !hasUserAnswer || !isCompleteIntakeState(parsed.data.intakeState)) {
+    if (!phone || !hasUserAnswer || !verifyState(parsed.data.intakeState) || !isCompleteIntakeState(parsed.data.intakeState)) {
       return NextResponse.json({ error: 'The brief is incomplete.' }, { status: 400 });
     }
 

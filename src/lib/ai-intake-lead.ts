@@ -59,9 +59,9 @@ export function buildIntakeLeadTelegramMessages(params: {
   receivedAt: Date;
 }): { leadId: string; chunks: string[] } {
   const state = parseIntakeState(params.intakeState);
-  const language = intakeLanguageFromMessages(params.messages);
+  const language = state.language;
   const progress = intakeProgress(state);
-  const userAnswers = params.messages
+  const userAnswers = state.history
     .filter((message) => message.role === 'user')
     .map((message, index) => `${index + 1}. ${message.content.trim()}`)
     .join('\n\n');
@@ -81,14 +81,14 @@ export function buildIntakeLeadTelegramMessages(params: {
   });
 
   const header = [
-    '🧭 ახალი AI ბრიფი (aiAUDIT.ge)',
+    '🧭 ახალი Quick Audit (aiAUDIT.ge)',
     '',
     `ლიდის კოდი: ${leadId}`,
     `ტელეფონი: ${params.phone}`,
     `მიღებულია: ${receivedAt}`,
-    `შევსებულია: ${progress.closed}/${progress.total}`,
+    `დადასტურებული საკითხები: ${progress.covered}; ინფორმაციის ნაკლებობა: ${progress.gaps}`,
     '',
-    'შეჯამებული ბრიფი',
+    'აუდიტის ანგარიში',
     brief,
   ].join('\n');
   const transcript = ['კლიენტის პასუხები', '', userAnswers].join('\n');

@@ -45,7 +45,7 @@ function StreamingAssistantText({
     let index = 0;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let timer = window.setTimeout(() => {
-      if (reducedMotion) {
+      if (reducedMotion || content.startsWith('aiAUDIT · Quick Audit')) {
         setVisibleContent(content);
         onComplete(messageId);
         return;
@@ -71,10 +71,10 @@ function StreamingAssistantText({
   }, [content, messageId, onComplete]);
 
   useEffect(() => {
-    if (!visibleContent) return;
+    if (!visibleContent || content.startsWith('aiAUDIT · Quick Audit')) return;
     const stage = stageRef.current;
     if (stage) stage.scrollTop = stage.scrollHeight;
-  }, [stageRef, visibleContent]);
+  }, [stageRef, visibleContent, content]);
 
   const isTyping = visibleContent.length < content.length;
   return (
@@ -198,7 +198,7 @@ export function HeroIntakeConversation({
                 </details>
               ) : null}
 
-              {message.suggestions?.length === 3 ? (
+              {message.suggestions?.length ? (
                 <div className="heroConversationSuggestions" aria-label="შესაძლო პასუხები">
                   {message.suggestions.map((suggestion) => (
                     <button

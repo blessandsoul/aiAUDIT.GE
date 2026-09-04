@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:audit": "node --experimental-strip-types --test scripts/audit-engine.test.mjs",
     "predev": "node -e \"const fs = require('fs'); const path = '.next/dev/lock'; try { fs.unlinkSync(path); console.log('🔓 Cleared Next.js lock file'); } catch(e) { /* file doesn't exist, ignore */ }\"",
     "dev": "next dev",
     "fetch-covers": "node scripts/fetch-covers.mjs",

@@ -98,10 +98,10 @@ export function AiIntakeLeadDialog({
         ) : (
           <form className="aiIntakeLeadForm" onSubmit={handleSubmit} noValidate>
             <DialogHeader>
-              <span className="aiIntakeLeadEyebrow">ბიზნეს აუდიტის დიაგნოსტიკა დასრულებულია</span>
+              <span className="aiIntakeLeadEyebrow">Quick Audit — შედეგების განხილვა</span>
               <DialogTitle>სად დაგიკავშირდეთ?</DialogTitle>
               <DialogDescription>
-                დატოვეთ ნომერი. aiAUDIT-ის ექსპერტი გააანალიზებს დიაგნოსტიკის მონაცემებს და შემოგთავაზებთ მზა სამოქმედო გეგმას.
+                დატოვეთ ნომერი, თუ გსურთ გუნდთან ერთად შედეგებისა და შემდეგი ნაბიჯის განხილვა.
               </DialogDescription>
             </DialogHeader>
 

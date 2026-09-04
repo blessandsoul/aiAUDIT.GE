@@ -15,6 +15,9 @@
 
 # next.js
 /.next/
+/.next-audit-check/
+/.next-audit-build/
+/artifacts/audit-check/
 /out/
 
 # production

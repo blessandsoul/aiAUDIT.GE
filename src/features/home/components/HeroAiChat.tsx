@@ -225,12 +225,12 @@ export function HeroAiChat() {
   }
 
   const handleMessageStreamComplete = useCallback((messageId: string): void => {
-    if (messageId === finalAssistantIdRef.current && !leadSubmitted) {
-      setLeadDialogOpen(true);
+    if (messageId === finalAssistantIdRef.current) {
+      finalAssistantIdRef.current = null;
     }
-  }, [leadSubmitted]);
+  }, []);
 
-  async function sendIntakeMessage(rawContent: string): Promise<void> {
+  async function sendIntakeMessage(rawContent: string, action?: 'finish'): Promise<void> {
     const content = rawContent.trim();
     if (!content || isIntakeLoading) return;
 
@@ -267,10 +267,14 @@ export function HeroAiChat() {
             content: messageContent,
           })),
           intakeState,
+          action,
         }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error('AI intake request failed');
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        throw new Error(typeof failure.error === 'string' ? failure.error : 'AI intake request failed');
+      }
 
       const payload = await response.json() as {
         content?: unknown;
@@ -286,14 +290,14 @@ export function HeroAiChat() {
       if (payload.intakeState
         && typeof payload.intakeState === 'object'
         && 'version' in payload.intakeState
-        && payload.intakeState.version === 1) {
+        && payload.intakeState.version === 2) {
         const nextIntakeState = payload.intakeState as IntakeState;
         setIntakeState(nextIntakeState);
         if (nextIntakeState.complete) finalAssistantIdRef.current = assistantId;
       }
 
       const suggestions = Array.isArray(payload.suggestions)
-        ? payload.suggestions.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3)
+        ? payload.suggestions.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 6)
         : [];
       const analysis = Array.isArray(payload.analysis)
         ? payload.analysis.filter((item): item is string => typeof item === 'string' && item.trim().replace(/[-–—•*.,;:!?()[\]{}"'`~|/\\\s]/g, '').length > 0).slice(0, 4)
@@ -311,9 +315,10 @@ export function HeroAiChat() {
       }
       setConversation((current) => current.map((message) => (
         message.id === assistantId
-          ? { ...message, content: 'ვერ მივიღე პასუხი. სცადეთ კიდევ ერთხელ.' }
+          ? { ...message, content: error instanceof Error && error.message.includes('expired') ? 'სესია განახლდა. განაახლეთ გვერდი და დაიწყეთ ახალი აუდიტი.' : 'პასუხის დამუშავება ვერ მოხერხდა. თქვენი პასუხი ქვემოთ დარჩა — სცადეთ ხელახლა.' }
           : message
       )));
+      setInput(content);
     } finally {
       if (intakeAbortRef.current === controller) intakeAbortRef.current = null;
       setIsIntakeLoading(false);
@@ -578,6 +583,37 @@ export function HeroAiChat() {
         onClose={() => setScannerOpen(false)}
         onApplyDiagnosis={launchPrompt}
       />
+      {intakeState && !intakeState.complete && intakeState.turn >= 5 ? (
+        <div className="heroQuickChips">
+          <button type="button" className="heroChip" disabled={isIntakeLoading} onClick={() => void sendIntakeMessage('მაჩვენეთ დასკვნა არსებული ინფორმაციით.', 'finish')}>
+            დასკვნა არსებული ინფორმაციით
+          </button>
+        </div>
+      ) : null}
+      {intakeState?.complete ? (
+        <div className="heroQuickChips" aria-label="აუდიტის შემდეგი ნაბიჯი">
+          <button type="button" className="heroChip" onClick={() => setLeadDialogOpen(true)} disabled={leadSubmitted}>
+            {leadSubmitted ? 'მოთხოვნა გაგზავნილია' : 'შედეგების განხილვა'}
+          </button>
+          <button type="button" className="heroChip" onClick={() => {
+            const report = conversation.filter((m) => m.role === 'assistant').at(-1)?.content || '';
+            const url = URL.createObjectURL(new Blob([report], { type: 'text/plain;charset=utf-8' }));
+            const link = document.createElement('a'); link.href = url; link.download = 'aiAUDIT-report.txt'; link.click(); URL.revokeObjectURL(url);
+          }}>ანგარიშის ჩამოტვირთვა</button>
+          <button type="button" className="heroChip" onClick={() => {
+            const report = conversation.filter((m) => m.role === 'assistant').at(-1)?.content || '';
+            const printable = window.open('', '_blank');
+            if (!printable) return;
+            printable.document.title = 'aiAUDIT — Quick Audit';
+            const style = printable.document.createElement('style');
+            style.textContent = 'body{font:14px/1.6 Arial,sans-serif;margin:36px;color:#10251c}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}';
+            printable.document.head.appendChild(style);
+            const text = printable.document.createElement('pre'); text.textContent = report;
+            printable.document.body.appendChild(text);
+            printable.focus(); printable.print();
+          }}>PDF / ბეჭდვა</button>
+        </div>
+      ) : null}
       <AiIntakeLeadDialog
         open={leadDialogOpen}
         onOpenChange={setLeadDialogOpen}
