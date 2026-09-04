@@ -51,7 +51,7 @@ const INTAKE_RESPONSE_SCHEMA = {
         required: ['field', 'status', 'summary', 'evidence'],
       },
     },
-    questionTargets: { type: 'array', items: { type: 'string', enum: INTAKE_FACT_IDS }, maxItems: 2 },
+    questionTargets: { type: 'array', items: { type: 'string', enum: INTAKE_FACT_IDS }, maxItems: 1 },
   },
   required: ['reply', 'suggestedAnswers', 'factUpdates', 'questionTargets'],
 } as const;
@@ -66,7 +66,8 @@ Rules:
 - Never make Excel, spreadsheets, CRM, catalogues, data sources, social media, integrations, or any aiNOW product the centre of the conversation unless the user's own task makes it relevant.
 - Do not follow a predetermined industry script. Select the next question only from genuinely unresolved fields in the ledger.
 - Do not ask for a fact whose ledger status is answered, declined, not_applicable, or needs_follow_up.
-- Ask about at most two closely related unresolved fields in one turn. Prefer one compact question bundle over several separate questions.
+- Ask exactly one diagnostic question per turn. Prefer the question that distinguishes the strongest competing explanations of the client's situation, not the next item in a generic form.
+- When a client already gave several facts, make a concise evidence-bound inference and ask the one question that would confirm or reject it. For example, a low number of inbound messages from an online shop is an acquisition/funnel hypothesis, not evidence that message automation is needed.
 - Use partial when the latest answer gives a useful fact but the field still needs one focused clarification. Use answered only when that field is sufficient for a practical brief.
 - If a field is irrelevant to this specific task, mark it not_applicable. Do not force the client to invent an answer.
 - If the client does not know or declines to answer, mark it declined. An approximate volume or outcome is acceptable.
@@ -76,9 +77,9 @@ Rules:
 - While the brief is still incomplete, do not prescribe a product or claim what a future solution will achieve. Explain only which decision the next missing facts will clarify.
 - suggestedAnswers must contain exactly three plausible client-side answers. Each option must answer the entire question bundle, not only its first part. The user remains free to type something else.
 - factUpdates may only contain facts supported by the latest user message. Each array item uses status partial/answered/declined/not_applicable, a concise factual summary, and evidence copied verbatim from the latest user message. Unsupported or non-verbatim evidence is rejected by the controller.
-- questionTargets contains zero, one, or two allowed field ids that remain unresolved after applying factUpdates.
+- questionTargets contains zero or one allowed field id that remains unresolved after applying factUpdates.
 - Return exactly the five top-level keys shown below. Do not rename or omit them. factUpdates must be an array.
-{"reply":"natural response with the next question","suggestedAnswers":["complete option 1","complete option 2","complete option 3"],"factUpdates":[{"field":"objective","status":"answered","summary":"concise supported fact","evidence":"exact quote from latest user message"}],"questionTargets":["current_process","pain_impact"]}`;
+{"reply":"natural response with the next question","suggestedAnswers":["complete option 1","complete option 2","complete option 3"],"factUpdates":[{"field":"objective","status":"answered","summary":"concise supported fact","evidence":"exact quote from latest user message"}],"questionTargets":["current_process"]}`;
 
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -215,16 +216,24 @@ function requestedTargetsMatch(value: unknown, targets: IntakeFactId[]): boolean
   if (!Array.isArray(value)) return false;
   const requested = [...new Set(value.filter((id): id is IntakeFactId => (
     typeof id === 'string' && INTAKE_FACT_IDS.includes(id as IntakeFactId)
-  )))].slice(0, 2);
+  )))].slice(0, 1);
   return requested.length === targets.length && requested.every((id, index) => id === targets[index]);
 }
 
-function chooseReply(parsed: ParsedProviderResponse, targets: IntakeFactId[], language: IntakeLanguage): string {
+function chooseReply(parsed: ParsedProviderResponse, targets: IntakeFactId[], language: IntakeLanguage, state: ReturnType<typeof parseIntakeState>): string {
+  const fallback = buildFallbackQuestion(targets, language, state);
+  if (targets.length === 0) {
+    return language === 'ka'
+      ? 'საკმარისი სანდო მონაცემი ჯერ არ გვაქვს დასკვნისთვის. დააზუსტეთ ის ფაქტი, რომლის გაზომვაც ყველაზე მარტივად შეგიძლიათ.'
+      : language === 'ru'
+        ? 'Для вывода пока недостаточно надёжных данных. Уточните факт, который вам проще всего измерить.'
+        : 'There is not enough reliable information for a conclusion yet. Please clarify the fact that is easiest for you to measure.';
+  }
   const usable = parsed.reply.length > 0
     && parsed.reply.includes('?')
     && !hasEmptyAcknowledgementPrefix(parsed.reply)
     && requestedTargetsMatch(parsed.questionTargets, targets);
-  return usable ? parsed.reply : buildFallbackQuestion(targets, language);
+  return usable ? parsed.reply : fallback;
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -275,12 +284,12 @@ export async function POST(request: NextRequest): Promise<Response> {
       latestUserMessage,
     );
 
-    const content = state.complete ? buildFinalBrief(state, language) : chooseReply(parsed, targets, language);
+    const content = state.complete ? buildFinalBrief(state, language) : chooseReply(parsed, targets, language, state);
     const suggestions = state.complete
       ? []
       : parsed.suggestedAnswers.length === 3
         ? parsed.suggestedAnswers
-        : fallbackSuggestions(language, targets);
+        : fallbackSuggestions(language, targets, state);
 
     return NextResponse.json({
       content,

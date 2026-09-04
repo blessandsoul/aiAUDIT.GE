@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
 import {
-  INTAKE_FACT_IDS,
   buildFinalBrief,
+  isIntakeComplete,
   intakeProgress,
   parseIntakeState,
   type IntakeLanguage,
@@ -33,10 +33,7 @@ export function intakeLanguageFromMessages(messages: IntakeLeadMessage[]): Intak
 }
 
 export function isCompleteIntakeState(value: unknown): value is IntakeState {
-  const state = parseIntakeState(value);
-  return INTAKE_FACT_IDS.every((id) => (
-    state.facts[id].status !== 'missing' && state.facts[id].status !== 'partial'
-  ));
+  return isIntakeComplete(value);
 }
 
 function splitTelegramText(text: string): string[] {
