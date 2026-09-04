@@ -16,6 +16,7 @@ Reports contain a conclusion, client evidence, opportunity/readiness, next test,
 - Exact user transcripts replayed: original 12-answer influencer brief and six-answer shop brief do not falsely finish or establish missing tracking/ownership/baseline evidence. Replaying old answers against new questions is a non-fabrication regression, not a natural conversation quality score.
 - Browser: actual UI/API answer-chip equality, mobile overflow check, early limited report, PDF generation, optional unchecked-consent dialog. Screenshots visually inspected. No lead submitted.
 - HTTP: rejected foreign origin, long input, obvious secret, legacy and tampered sessions; EN→RU retained facts, explicit unknown stayed unknown.
+- Post-deployment browser testing exposed occasional generic-growth routing of an explicit influencer-source question. A multilingual server routing hint now keeps that question in attribution. The hint establishes no business facts or recommendation; the source-recording question is still required.
 - Unit coverage: question/answer contracts, provenance, refusals, anti-repetition, partial data, contradictions, readiness, false recommendations and signed-state tampering. Run `npm run test:audit` using Node 24 (or a Node release supporting TypeScript stripping).
 
 ## Reproduce

@@ -55,6 +55,13 @@ export function questionFor(s: IntakeState): { field: Field; content: string; su
 export function isControlAnswer(message: string): boolean {
   return /^(?:გასაგებია[,!]?\s*(?:მადლობა)?|მადლობა|დამატებითი დეტალები მაქვს|понятно|спасибо|есть дополнительные детали|thanks|thank you|okay|ok)[.!\s]*$/iu.test(message.trim());
 }
+// Routing hint only, never a confirmed fact or recommendation. An explicit
+// influencer-measurement question must not get lost in generic growth intake.
+export function attributionHint(message: string): boolean {
+  const text = message.replace(/[\u200b-\u200f\u2060\ufeff]/gu, '').toLowerCase();
+  return /ინფლუენსერ|ბლოგერ|influencer|blogger|блогер|инфлюенсер|инфлуенсер/u.test(text)
+    && /წყარო|შეკვეთ|გაყიდვ|შედეგ|ეფექტიან|ანალიტიკ|გაზომ|დათვლ|attribut|source|order|sale|measur|effect|analytic|источник|заказ|продаж|измер|эффектив|аналитик|посчит/u.test(text);
+}
 export function exactChoice(s: IntakeState, message: string): Update | null {
   if (!s.currentQuestion) return null;
   const field = s.currentQuestion, text = message.trim();
@@ -92,6 +99,9 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     && (s.focus === 'discovery' || s.focus === 'growth' || !known(previous.facts.pain) || val(s, 'priority_check') === 'another')) {
     s.focus = extraction.focus; s.focusQuote = extraction.focusEvidence;
     if (val(s, 'priority_check') === 'another') delete s.facts.priority_check;
+  }
+  if (!control && ['discovery', 'growth'].includes(s.focus) && attributionHint(message)) {
+    s.focus = 'attribution'; s.focusQuote = message.slice(0, 600);
   }
   const required = requiredFields(s);
   const exhausted = finish || s.turn >= MAX_AUDIT_TURNS;

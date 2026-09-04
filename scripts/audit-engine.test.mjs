@@ -83,3 +83,9 @@ test('partial enum value is not retained as an apparent answer',()=>{
 test('paid advertising without purchase measurement cannot receive an AI pilot',()=>{
   const s=prepared('ads');fact(s,'tracking','none');assert.equal(assess(s).verdict,'measurement_first');assert.equal(assess(s).product,null);
 });
+test('explicit influencer measurement overrides generic growth routing but invents no facts',()=>{
+  for (const text of ['გვინდა ინფლუენსერების შედეგის გაზომვა', 'Не можем посчитать продажи от блогеров', 'We cannot attribute orders to influencers']) {
+    const s=advanceAudit(createIntakeState(),text,{...empty,focus:'growth',focusEvidence:text});
+    assert.equal(s.focus,'attribution');assert.equal(s.facts.attribution,undefined);assert.equal(assess(s).product,null);
+  }
+});

@@ -24,6 +24,7 @@ for(let i=0;i<5;i++){
   if(await button.count()) await button.click();
   else {await page.locator('textarea.heroTextarea').fill(text); await page.locator('button.heroSendBtn').click();}
   const response=await waiting;assert.equal(response.status(),200);last=await response.json();
+  assert.equal(last.intakeState.focus,'attribution','An explicit influencer source problem must stay in measurement diagnosis');
   await page.getByText(last.content,{exact:true}).waitFor({timeout:15000});
   const labels=await page.locator('.heroConversationSuggestions button').allTextContents();
   assert.deepEqual(labels,last.suggestions);
