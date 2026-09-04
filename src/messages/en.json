@@ -1,0 +1,173 @@
+{
+  "seo": {
+    "contact": {
+      "title": "Contact: aiAUDIT — AI Business Diagnostics & Audit",
+      "description": "Get in touch with aiAUDIT. Objective business process diagnostics, AI readiness assessment, and a bounded pilot plan for your company."
+    },
+    "notFound": {
+      "title": "404: Page Not Found",
+      "description": "The page you are looking for does not exist. Return home to explore aiAUDIT.",
+      "heading": "Page Not Found",
+      "body": "The page you are looking for does not exist or has been moved.",
+      "backHome": "Back to Home"
+    }
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "Leave your number and our AI consultant will get in touch.",
+    "phone": "Phone number",
+    "phonePlaceholder": "+995 5XX XXX XXX",
+    "submit": "Submit",
+    "submitting": "Sending...",
+    "successTitle": "Received!",
+    "successMessage": "We will contact you shortly.",
+    "errorMessage": "An error occurred. Please try again.",
+    "contactInfo": "Contact Information",
+    "phoneLabel": "Phone",
+    "emailLabel": "Email",
+    "officeLabel": "Office",
+    "office": "3 Tornike Eristavi St, Tbilisi, Georgia",
+    "legalLabel": "Legal Address",
+    "legal": "Zemo Plato, III block, N14, Apt 87, Tbilisi 0163"
+  },
+  "landingNav": {
+    "products": "Products",
+    "productDescriptions": {
+      "aichats": "AI chat agent and chatbots",
+      "aicall": "AI voice agent",
+      "aiads": "Facebook and Instagram advertising",
+      "aicontent": "AI content for business",
+      "aidocs": "Document automation",
+      "aiweb": "Website creation and management",
+      "aioffice": "AI assistant for employees",
+      "aiapp": "Mobile apps for business",
+      "aistaff": "Find AI specialists",
+      "aibrain": "Company knowledge base",
+      "aijurist": "AI assistant for lawyers",
+      "aimusic": "Music for businesses",
+      "vibecoding": "AI app security",
+      "aitaxi": "Taxi fleet management"
+    },
+    "showcase": "Audit",
+    "process": "How It Works",
+    "faq": "FAQ",
+    "cta": "Start Audit"
+  },
+  "landingFooter": {
+    "company": "aiNOW LLC · Tbilisi, Georgia",
+    "familyHeading": "aiNOW Ecosystem",
+    "companyHeading": "Company",
+    "socialHeading": "Social Media",
+    "languageHeading": "Language",
+    "contact": "Contact",
+    "sectionShowcase": "Audit",
+    "sectionWork": "How It Works",
+    "sectionFaq": "FAQ",
+    "ctaHuge": "Discover where your business truly needs AI",
+    "copyright": "© {year} aiNOW. All rights reserved."
+  },
+  "product": {
+    "seo": {
+      "title": "aiAUDIT · Discover where AI truly delivers value for your business",
+      "description": "Objective AI diagnostics and business workflow audit. Identify where automation yields real ROI and receive a measurable pilot project plan."
+    },
+    "hero": {
+      "audience": "For decision-makers who want measurable outcomes",
+      "owner": "Your",
+      "role": "AI Business Audit",
+      "lead": "We diagnose your",
+      "sub": "Tell us what your company does and what you want to improve. Our AI system analyzes operational bottlenecks and identifies clear, measurable solutions.",
+      "taglinePrefix": "Artificial intelligence that",
+      "taglineWorks": "diagnoses",
+      "typewriterWords": "processes, sales, support calls, routine tasks, overhead, documents, marketing, lead flow",
+      "typewriterPrefill": "processes",
+      "ctaResults": "Start Audit",
+      "ctaCall": "Book Consultation",
+      "commitment": "The audit is grounded in real operational facts. If AI is not justified for your business, we will state it directly.",
+      "signedBy": "aiAUDIT examines your workflow, isolates bottlenecks, and structures a measurable pilot."
+    },
+    "heroStory": {
+      "badge": "Diagnostic Flow",
+      "inputLabel": "Business Context",
+      "input": "We have daily support calls and messages, and the team struggles to respond in time.",
+      "bridgeLabel": "AI Evaluates Bottleneck",
+      "bridge": "The system determines lost response time, communication channels, and calculates automation viability.",
+      "productLabel": "aiAUDIT Delivers Findings",
+      "productAction": "Overloaded operational node identified: incoming inquiries and repetitive FAQs.",
+      "detailOne": "Workflow analyzed",
+      "detailTwo": "ROI verified",
+      "resultLabel": "Recommendation Ready",
+      "result": "The owner sees exactly where time is saved and what the first pilot step looks like.",
+      "businessLabel": "What the Business Gets",
+      "businessValue": "Clear operational priorities and measurable economic impact.",
+      "replay": "Replay Flow"
+    },
+    "work": {
+      "eyebrow": "How Diagnostics Works",
+      "headingPre": "Three Phases.",
+      "headingAccent": "From conversation to a measurable pilot.",
+      "s1Title": "1. Operational Context & Goals",
+      "s1Tag": "Interactive Intake",
+      "s1Desc": "Tell us how your business operates today: where time is lost, how customers reach you, and where the bottlenecks are.",
+      "s2Title": "2. Causal Bottleneck Analysis",
+      "s2Tag": "AI Diagnostics",
+      "s2Desc": "The system evaluates operational facts to isolate specific nodes where AI will reduce overhead and increase response speed.",
+      "s3Title": "3. Feasibility & ROI Validation",
+      "s3Tag": "Objective Filter",
+      "s3Desc": "If AI is economically unjustified for your volume, we tell you immediately. No fabricated sales pitches or unneeded tools.",
+      "s4Title": "4. Tailored AI Solution Matching",
+      "s4Tag": "0 to 3 Recommendations",
+      "s4Desc": "Matched solutions (chat assistant, voice operator, document automation, or ad optimization) strictly fit your requirements.",
+      "s5Title": "5. Bounded Pilot Roadmap",
+      "s5Tag": "Zero Risk",
+      "s5Desc": "We define specific success metrics and a safe testing window on real data before any full-scale deployment.",
+      "s6Title": "6. Monitoring & Value Verification",
+      "s6Tag": "Measurable Impact",
+      "s6Desc": "Management receives clear reports on saved labor hours, improved response rates, and system stability."
+    },
+    "faq": {
+      "headingPre": "Questions",
+      "headingAccent": "Answered",
+      "subtitle": "Everything you need to know before starting an AI diagnostic audit.",
+      "q1": "What is <brand></brand> and how does it differ from standard consulting?",
+      "a1": "aiAUDIT is an impartial AI diagnostic platform. We do not sell generic ideas; we analyze your actual workflows to determine where AI delivers measurable economic impact.",
+      "q2": "How long does the initial Quick Audit take?",
+      "a2": "The interactive chat audit takes 3 to 5 minutes. The system asks focused questions about your operations, volume, and current pain points.",
+      "q3": "What if my business does not need AI yet?",
+      "a3": "We will tell you directly with clear reasoning. If your current volume or unit economics do not justify automation, we will not recommend unneeded tools.",
+      "q4": "What data is required to run the audit?",
+      "a4": "High-level information about your company activities, customer communication channels, inquiry volume, and main bottlenecks is sufficient. Passwords or confidential financial records are not needed.",
+      "q5": "How are recommendations verified?",
+      "a5": "Every recommendation is directly derived from the operational facts you supply. We structure a small, bounded pilot measured against specific KPIs.",
+      "q6": "Which business functions can be audited?",
+      "a6": "The audit covers customer support (chats, calls), sales pipelines, marketing and ad spend, document processing, and internal operational routines.",
+      "q7": "Is the initial audit free?",
+      "a7": "Yes, the initial online diagnosis and recommendation summary are completely free with zero obligation.",
+      "q8": "What is Deep Audit and when is it required?",
+      "a8": "Deep Audit is an advanced analysis for mid-sized and enterprise companies evaluating integrations with CRM, ERP, and internal databases.",
+      "q9": "How is business confidentiality protected?",
+      "a9": "All diagnostic data is processed via secure encrypted protocols and is never used to train public models. NDAs are available upon request.",
+      "q10": "How is pilot success determined?",
+      "a10": "Before launching a pilot, we agree on measurable metrics: response time reduction, zero lost leads, saved employee hours, or increased conversion.",
+      "q11": "What happens after the pilot?",
+      "a11": "If the pilot proves economic value, we proceed to full deployment and ongoing support. If not, the engagement ends cleanly with no lock-in.",
+      "q12": "How do I start the audit?",
+      "a12": "Type your company activity and primary challenge into the input box above, and AI will begin the diagnostic dialogue immediately.",
+      "q13": "How long does it take to prepare a pilot?",
+      "a13": "A standard pilot roadmap and setup are ready within 48-72 hours following the audit.",
+      "q14": "Who owns the audit report?",
+      "a14": "You own 100% of the diagnostic report and recommendations."
+    },
+    "cta": {
+      "heading": "Discover where AI truly delivers value for your business",
+      "subtitle": "Tell us about your company and receive an objective diagnostic report.",
+      "phoneLabel": "Phone number",
+      "phoneSubmit": "Call me",
+      "phoneNote": "We will contact you within 24 hours",
+      "orWrite": "Or reach us via:"
+    },
+    "wordmark": {
+      "line": "Objective AI diagnostics for business."
+    }
+  }
+}

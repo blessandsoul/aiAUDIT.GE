@@ -1,0 +1,15 @@
+/* Per-site brand tokens for aiAUDIT.ge */
+
+:root {
+  --primary: #059669;
+  --primary-foreground: #ffffff;
+  --accent: #10b981;
+  --accent-foreground: #ffffff;
+  --ring: #059669;
+  --brand: #059669;
+  --brand-soft: #a7f3d0;
+  --brand-cta: #059669;
+  --accent-cta: #047857;
+  --brand-ink: #065f46;
+  --brand-display: #059669;
+}

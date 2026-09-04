@@ -1,0 +1,184 @@
+.aiIntakeLeadBackdrop {
+  background: color-mix(in srgb, var(--foreground) 24%, transparent);
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+
+.aiIntakeLeadDialog {
+  width: min(440px, calc(100vw - 32px));
+  gap: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 20px;
+  background: var(--background);
+  padding: 28px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--foreground) 7%, transparent),
+    0 24px 70px -28px color-mix(in srgb, var(--foreground) 34%, transparent);
+}
+
+.aiIntakeLeadForm,
+.aiIntakeLeadSuccess {
+  display: grid;
+  gap: 18px;
+}
+
+.aiIntakeLeadDialog [data-slot="dialog-title"] {
+  color: var(--foreground);
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.aiIntakeLeadDialog [data-slot="dialog-description"] {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.aiIntakeLeadEyebrow {
+  width: fit-content;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: color-mix(in srgb, var(--primary) 82%, var(--foreground));
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aiIntakeLeadField {
+  display: grid;
+  gap: 8px;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.aiIntakeLeadField input {
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+  color: var(--foreground);
+  padding: 0 14px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  outline: 0;
+  transition: border-color 160ms cubic-bezier(.23, 1, .32, 1), box-shadow 160ms cubic-bezier(.23, 1, .32, 1);
+}
+
+.aiIntakeLeadField input:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.aiIntakeLeadField input[aria-invalid="true"] {
+  border-color: var(--destructive);
+}
+
+.aiIntakeLeadConsent {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: start;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.aiIntakeLeadConsent input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0 3px;
+  accent-color: var(--primary);
+}
+
+.aiIntakeLeadError {
+  min-height: 18px;
+  color: var(--destructive);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.aiIntakeLeadSubmit,
+.aiIntakeLeadSecondary {
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 750;
+  transition: transform 150ms cubic-bezier(.23, 1, .32, 1), background-color 150ms ease, opacity 150ms ease;
+}
+
+.aiIntakeLeadSubmit {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.aiIntakeLeadSecondary {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.aiIntakeLeadSubmit:hover:not(:disabled),
+.aiIntakeLeadSubmit:focus-visible {
+  background: color-mix(in srgb, var(--primary) 88%, var(--foreground));
+}
+
+.aiIntakeLeadSecondary:hover,
+.aiIntakeLeadSecondary:focus-visible {
+  background: color-mix(in srgb, var(--muted) 82%, var(--foreground));
+}
+
+.aiIntakeLeadSubmit:active:not(:disabled),
+.aiIntakeLeadSecondary:active {
+  transform: scale(.96);
+}
+
+.aiIntakeLeadSubmit:focus-visible,
+.aiIntakeLeadSecondary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  outline-offset: 2px;
+}
+
+.aiIntakeLeadSubmit:disabled {
+  cursor: wait;
+  opacity: .62;
+}
+
+.aiIntakeLeadSuccess {
+  justify-items: start;
+}
+
+.aiIntakeLeadSuccessMark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.aiIntakeLeadSuccess .aiIntakeLeadSecondary {
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .aiIntakeLeadDialog {
+    padding: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aiIntakeLeadDialog,
+  .aiIntakeLeadBackdrop {
+    animation-duration: .01ms !important;
+  }
+}
