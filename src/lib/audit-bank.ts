@@ -1,7 +1,7 @@
 export type Language = 'ka' | 'ru' | 'en';
 export type Localized = Record<Language, string>;
 export const l = (ka: string, ru: string, en: string): Localized => ({ ka, ru, en });
-export const FOCUSES = ['discovery', 'growth', 'attribution', 'chats', 'calls', 'ads', 'content', 'docs', 'web', 'operations'] as const;
+export const FOCUSES = ['discovery', 'growth', 'attribution', 'chats', 'calls', 'ads', 'content', 'docs', 'web', 'office', 'app', 'rescue', 'staff', 'fleet', 'operations'] as const;
 export type Focus = typeof FOCUSES[number];
 type Option = { value: string; label: Localized };
 export type Question = { text: Localized; meaning: string; options: Option[] };
@@ -81,6 +81,12 @@ export const BANK = {
     option('qualification', 'პირველადი კითხვები და კვალიფიკაცია', 'Первичные вопросы и квалификация', 'Initial questions and qualification'),
     option('expert', 'სპეციალისტის კონსულტაცია', 'Консультация специалиста', 'Expert consultation'),
   ]),
+  call_permission: q('aiCALL does not route cold lists. Establish the relationship and permission path before any call pilot.', 'ვის ურეკავთ ამ პროცესში და რა კავშირი გაქვთ მათთან?', 'Кому вы звоните в этом процессе и какие у вас с ними отношения?', 'Who would be called in this process, and what relationship do you have with them?', [
+    option('existing', 'საკუთარ კლიენტებს არსებული მომსახურების შესახებ', 'Своим клиентам по текущей услуге', 'Our own customers about an existing service'),
+    option('consent', 'მათთან გვაქვს დადასტურებული თანხმობის გზა', 'Есть подтверждённый путь согласия', 'We have a confirmed consent path'),
+    option('cold', 'ცივ ან შეძენილ სიას', 'По холодной или купленной базе', 'A cold or bought list'),
+    option('unclear', 'ჯერ არ ვიცით', 'Пока не знаем', 'We do not know yet'),
+  ]),
   content_gap: q('Which content production stage is the bottleneck; low views does not prove production bottleneck.', 'კონტენტის შექმნის რომელ ეტაპზე ფერხდება საქმე?', 'На каком этапе тормозит создание контента?', 'Where does content production get delayed?', [
     option('production', 'ტექსტის ან ვიზუალის შექმნისას', 'При создании текста или визуала', 'Writing or visual production'),
     option('approval', 'შეთანხმებისა და დამტკიცებისას', 'На согласовании', 'Review and approval'),
@@ -94,6 +100,31 @@ export const BANK = {
     option('decision', 'პროფესიული გადაწყვეტილების მიღება', 'Профессиональное решение по документу', 'Making a professional decision'),
   ]),
   web_task: q('User task blocked on the site; appearance alone does not establish AI opportunity.', 'რომელ მოქმედებას ვერ ასრულებს მომხმარებელი საიტზე დამოუკიდებლად?', 'Какое действие клиент не может самостоятельно выполнить на сайте?', 'What can a customer not complete independently on your website?'),
+  office_task: q('Internal workflow category. A single document workflow may belong to aiDOCS, not a broad office rebuild.', 'რომელი შიდა პროცესი მოითხოვს ყველაზე მეტ ხელით გადატანას ან შეთანხმებას?', 'Какой внутренний процесс требует больше всего ручного переноса или согласования?', 'Which internal process involves the most manual transfer or approvals?', [
+    option('orders', 'შეკვეთების ან მარაგის განახლება', 'Обновление заказов или остатков', 'Updating orders or inventory'),
+    option('approvals', 'შეთანხმება და დამტკიცება', 'Согласование и утверждение', 'Approvals and sign-off'),
+    option('reporting', 'რამდენიმე სისტემიდან ანგარიშის შეჯერება', 'Сведение отчётов из нескольких систем', 'Reconciling reports across systems'),
+    option('transfer', 'ერთი სისტემიდან მეორეში გადატანა', 'Перенос данных между системами', 'Transferring data between systems'),
+  ]),
+  app_task: q('A bespoke build is a new software capability, not a generic wish for AI.', 'რა ახალი მოქმედება ან ინტეგრაცია სჭირდება ბიზნესს, რომელსაც არსებული ხელსაწყო ვერ ასრულებს?', 'Какое новое действие или интеграция нужны бизнесу, которых нет в текущих инструментах?', 'What new action or integration does the business need that current tools cannot provide?', [
+    option('customer', 'კლიენტისთვის ახალი ციფრული სერვისი', 'Новый цифровой сервис для клиента', 'A new digital customer service'),
+    option('internal', 'განსაკუთრებული შიდა სამუშაო ადგილი', 'Специальный внутренний рабочий процесс', 'A bespoke internal workspace'),
+    option('integration', 'სისტემების ახალი ინტეგრაცია', 'Новая интеграция систем', 'A new systems integration'),
+  ]),
+  rescue_task: q('This routes an existing application to technical assessment. It is not a security certification or a request for credentials.', 'რა ხდება უკვე არსებულ აპლიკაციაში, რის გამოც ტექნიკური შეფასება გჭირდებათ?', 'Что происходит в уже существующем приложении, из-за чего нужна техническая оценка?', 'What is happening in the existing application that requires a technical assessment?', [
+    option('breaks', 'ფუნქციები ხშირად ფუჭდება', 'Функции часто ломаются', 'Features keep breaking'),
+    option('maintain', 'ვერ ვცვლით ან ვერ ვუვლით', 'Не можем менять или поддерживать', 'We cannot change or maintain it'),
+    option('review', 'AI-ით შექმნილი კოდი შეფასებას საჭიროებს', 'Нужна оценка кода, созданного AI', 'AI-built code needs review'),
+  ]),
+  staff_task: q('aiSTAFF is a live specialist, not an automated chat. Identify the human work that must remain human.', 'რომელ კლიენტურ სამუშაოს სჭირდება ცოცხალი სპეციალისტი და არა ავტომატური პასუხი?', 'Какая клиентская работа требует живого специалиста, а не автоматического ответа?', 'Which customer-facing work needs a live specialist rather than an automated reply?', [
+    option('complex', 'რთული ინდივიდუალური მოთხოვნები', 'Сложные индивидуальные запросы', 'Complex individual requests'),
+    option('followup', 'მოლაპარაკება და შემდგომი კომუნიკაცია', 'Переговоры и дальнейшая коммуникация', 'Negotiation and follow-up'),
+    option('coverage', 'საჭიროა მეტი ცოცხალი მომსახურების მოცვა', 'Нужно больше покрытия живым сервисом', 'More live-service coverage is needed'),
+  ]),
+  fleet_task: q('Autonomous fleet direction is not a currently deployable Quick Audit recommendation.', 'ეს საკითხი რეალურად ავტონომიურ სატრანსპორტო ფლოტს ეხება?', 'Этот вопрос действительно касается автономного транспортного флота?', 'Is this genuinely about an autonomous transport fleet?', [
+    option('yes', 'კი, ფლოტის ავტონომიურ მუშაობას', 'Да, автономной работе флота', 'Yes, autonomous fleet operation'),
+    option('no', 'არა, ჩვეულებრივ ლოგისტიკურ პროცესს', 'Нет, обычному логистическому процессу', 'No, a regular logistics process'),
+  ]),
   scale: q('Volume AND time period of the target process. Do not infer workload from this alone.', 'დაახლოებით რა მოცულობის სამუშაოა ჩვეულებრივ დღეში ან კვირაში?', 'Какой примерно объём этой работы за обычный день или неделю?', 'Roughly how much of this work occurs in a typical day or week?'),
   impact: q('Observed cost in time/money/errors with context. A growth aspiration is not impact.', 'რა ზიანი მოაქვს ამ სირთულეს — მაგალითად, რამდენ დროს კარგავთ ან რა საქმე რჩება შეუსრულებელი?', 'Чем обходится эта проблема — сколько времени теряется или какая работа остаётся невыполненной?', 'What does this problem cost you in time, errors, or work left undone?'),
   severity: q('Client confirms material recurring consequence, manageable nuisance, or no impact. Never derive from volume.', 'ეს სირთულე რამდენად უშლის ხელს ყოველდღიურ მუშაობას?', 'Насколько эта проблема мешает повседневной работе?', 'How much does this problem interfere with daily work?', [
@@ -134,10 +165,15 @@ export const BRANCH_FIELDS: Record<Focus, Field[]> = {
   growth: ['bottleneck', 'conversion', 'loss_reason', 'acquisition'],
   attribution: ['attribution', 'reporting_gap', 'attribution_check', 'reporting_decision'],
   chats: ['response', 'repetition'],
-  calls: ['call_task', 'response', 'repetition'],
+  calls: ['call_task', 'call_permission', 'response', 'repetition'],
   ads: ['acquisition', 'tracking', 'ads_work', 'repetition'],
   content: ['content_gap', 'repetition'],
   docs: ['docs_task', 'repetition'],
   web: ['web_task', 'repetition'],
+  office: ['office_task', 'repetition'],
+  app: ['app_task'],
+  rescue: ['rescue_task'],
+  staff: ['staff_task'],
+  fleet: ['fleet_task'],
   operations: ['process', 'repetition'],
 };

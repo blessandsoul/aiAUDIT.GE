@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BANK, FIELDS } from '../src/lib/audit-bank.ts';
-import { advanceAudit, assess, createIntakeState, exactChoice, isIntakeComplete, questionFor, requiredFields } from '../src/lib/audit-engine.ts';
+import { advanceAudit, assess, createIntakeState, exactChoice, focusHint, isIntakeComplete, questionFor, requiredFields } from '../src/lib/audit-engine.ts';
 import { buildFinalBrief } from '../src/lib/audit-report.ts';
 import { signState, verifyState } from '../src/lib/audit-session.ts';
 const empty = { focus: 'discovery', focusEvidence: '', updates: [], nextField: null };
@@ -80,6 +80,11 @@ test('partial enum value is not retained as an apparent answer',()=>{
   const s=advanceAudit(createIntakeState(),'Excel',{...empty,updates:[{field:'attribution',value:'none',status:'partial',evidence:'Excel',correction:false}]});
   assert.equal(s.facts.attribution.value,'');assert.equal(s.facts.attribution.status,'partial');
 });
+test('a direct answer to an open server question is retained verbatim when the extractor is partial',()=>{
+  const s=createIntakeState();s.currentQuestion='business';
+  const next=advanceAudit(s,'დისტრიბუციის კომპანია ვართ.',{...empty,updates:[{field:'business',value:'',status:'partial',evidence:'დისტრიბუციის კომპანია ვართ.',correction:false}]});
+  assert.equal(next.facts.business.status,'confirmed');assert.equal(next.facts.business.quote,'დისტრიბუციის კომპანია ვართ.');
+});
 test('paid advertising without purchase measurement cannot receive an AI pilot',()=>{
   const s=prepared('ads');fact(s,'tracking','none');assert.equal(assess(s).verdict,'measurement_first');assert.equal(assess(s).product,null);
 });
@@ -88,4 +93,31 @@ test('explicit influencer measurement overrides generic growth routing but inven
     const s=advanceAudit(createIntakeState(),text,{...empty,focus:'growth',focusEvidence:text});
     assert.equal(s.focus,'attribution');assert.equal(s.facts.attribution,undefined);assert.equal(assess(s).product,null);
   }
+});
+test('catalog routing recognizes every audited product domain without treating routing as evidence',()=>{
+  const examples = {
+    chats: 'გვიან ვპასუხობთ Instagram შეტყობინებებს', calls: 'ზარებით ვადასტურებთ ჩაწერას', ads: 'ფასიან რეკლამას და კამპანიებს ვმართავთ', content: 'კონტენტის შექმნა გვიგვიანდება', docs: 'დოკუმენტიდან მონაცემს ხელით ვწერთ', web: 'საიტზე კლიენტი ვერ ტოვებს მოთხოვნას', office: 'შეკვეთას ხელით გადაგვაქვს Excel-დან სისტემაში', app: 'ახალი აპლიკაციის აშენება გვჭირდება', rescue: 'არსებული AI აპლიკაცია ხშირად ფუჭდება', staff: 'ცოცხალი სპეციალისტი გვჭირდება რთული მოთხოვნებისთვის', fleet: 'ავტონომიური ფლოტის პროექტი გვაინტერესებს',
+  };
+  for (const [focus, message] of Object.entries(examples)) {
+    assert.equal(focusHint(message), focus);
+    const s=advanceAudit(createIntakeState(),message,empty);assert.equal(s.focus,focus);assert.deepEqual(s.facts,{});
+  }
+});
+test('an explicit first-turn process route beats a generic model operations route',()=>{
+  const message='შეკვეთების ინფორმაცია ხელით გადაგვაქვს Excel-დან საწყობის სისტემაში';
+  const s=advanceAudit(createIntakeState(),message,{...empty,focus:'operations',focusEvidence:'შეკვეთების ინფორმაცია'});
+  assert.equal(s.focus,'office');assert.deepEqual(s.facts,{});
+});
+test('aiCALL refuses cold-list route while bookings from own customers can reach a pilot',()=>{
+  const cold=prepared('calls');fact(cold,'call_task','booking');fact(cold,'call_permission','cold');assert.equal(assess(cold).product,null);
+  const own=prepared('calls');fact(own,'call_task','booking');fact(own,'call_permission','existing');assert.equal(assess(own).product,'aiCALL');
+});
+test('office, bespoke app, repair and live specialist have distinct recommendations',()=>{
+  const office=prepared('office');fact(office,'office_task','transfer');assert.equal(assess(office).product,'aiOFFICE');
+  const app=prepared('app');fact(app,'app_task','integration');assert.equal(assess(app).verdict,'scoped_discovery');assert.equal(assess(app).product,'aiAPP');
+  const rescue=prepared('rescue');fact(rescue,'rescue_task','breaks');assert.equal(assess(rescue).verdict,'technical_assessment');assert.equal(assess(rescue).product,'vibeCODING');
+  const staff=prepared('staff');fact(staff,'staff_task','complex');assert.equal(assess(staff).verdict,'human_service');assert.equal(assess(staff).product,'aiSTAFF');
+});
+test('autonomous fleet is understood but never sold through Quick Audit',()=>{
+  const s=prepared('fleet');fact(s,'fleet_task','yes');assert.equal(assess(s).verdict,'not_available');assert.equal(assess(s).product,null);
 });

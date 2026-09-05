@@ -1,4 +1,5 @@
 import { BANK, BRANCH_FIELDS, DECLINED, FIELDS, FOCUSES, UNKNOWN, l, type Field, type Focus, type Language } from './audit-bank.ts';
+import { PRODUCT_CATALOG, PRODUCT_FOR_FOCUS, type ProductKey } from './audit-product-catalog.ts';
 export type IntakeLanguage = Language;
 export type FactStatus = 'confirmed' | 'estimated' | 'partial' | 'unknown' | 'declined' | 'not_applicable' | 'contradicted';
 export type Fact = { id: string; field: Field; value: string; status: FactStatus; quote: string; turn: number; previous?: { value: string; quote: string } };
@@ -39,6 +40,11 @@ export function requiredFields(s: IntakeState): Field[] {
   const core: Field[] = ['business', 'objective', 'pain', ...branch, 'process', 'scale', 'impact', 'severity'];
   if (s.focus === 'discovery') core.splice(2, 0, 'area');
   if (['none', 'minor'].includes(val(s, 'severity'))) return [...new Set<Field>([...core, 'priority_check'])];
+  // A human service, bespoke discovery, existing-app assessment and an unavailable
+  // fleet direction do not need to masquerade as a ready-to-run AI automation.
+  if (s.focus === 'staff') return [...new Set<Field>([...core, 'owner', 'priority_check'])];
+  if (s.focus === 'fleet') return [...new Set<Field>([...core, 'priority_check'])];
+  if (['app', 'rescue'].includes(s.focus)) return [...new Set<Field>([...core, 'systems', 'data', 'owner', 'constraints', 'baseline', 'priority_check'])];
   return [...new Set([...core, 'systems', 'data', 'alternative', 'owner', 'constraints', 'baseline', 'priority_check'] as Field[])];
 }
 export function questionFor(s: IntakeState): { field: Field; content: string; suggestions: string[] } | null {
@@ -62,6 +68,24 @@ export function attributionHint(message: string): boolean {
   return /ინფლუენსერ|ბლოგერ|influencer|blogger|блогер|инфлюенсер|инфлуенсер/u.test(text)
     && /წყარო|შეკვეთ|გაყიდვ|შედეგ|ეფექტიან|ანალიტიკ|გაზომ|დათვლ|attribut|source|order|sale|measur|effect|analytic|источник|заказ|продаж|измер|эффектив|аналитик|посчит/u.test(text);
 }
+// Routing is intentionally conservative: it only helps at the beginning of an
+// audit. The model still has to extract quoted facts and the server still has
+// to satisfy the product's independent evidence rules.
+export function focusHint(message: string): Focus | null {
+  const text = message.replace(/[\u200b-\u200f\u2060\ufeff]/gu, '').toLowerCase();
+  if (/ავტონომ|robotaxi|ფლოტ|беспилот|автономн.{0,15}флот|robotaxi|autonomous.{0,15}fleet/u.test(text)) return 'fleet';
+  if (/(?:არსებულ|existing|существующ).{0,40}(?:აპლიკ|прилож|app)|(?:ფუჭდ|лома|broken|maintain|поддерж).{0,40}(?:აპლიკ|прилож|app)|vibecod/u.test(text)) return 'rescue';
+  if (/(?:ახალ|new|нов).{0,30}(?:აპლიკ|прилож|app|ინტეგрац|интеграц|integration)|(?:აპლიკ|прилож|app).{0,20}(?:აშენ|build|разработ)/u.test(text)) return 'app';
+  if (/ცოცხალ.{0,15}(?:სპეციალისტ|მომსახურ)|live.{0,15}specialist|жив.{0,15}специалист/u.test(text)) return 'staff';
+  if (/რეკლამ|реклам|paid ad|campaign|კამპანი/u.test(text)) return 'ads';
+  if (/კონტენტ|контент|content.{0,20}(?:create|производ|შექმნ)/u.test(text)) return 'content';
+  if (/დოკუმენტ|документ|invoice|ინვოის|накладн/u.test(text)) return 'docs';
+  if (/საიტ|website|web.?site|лендинг/u.test(text)) return 'web';
+  if (/შეკვეთ.{0,80}(?:excel|таблиц|სისტემ)|approval|დამტკიც|ручн.{0,15}(?:перенос|ввод)|ხელით.{0,50}(?:გადატან|შეყვან)/u.test(text)) return 'office';
+  if (/ზარ|ურეკ|телефон|звон|call|booking|ჩაწერ/u.test(text)) return 'calls';
+  if (/instagram|whatsapp|messenger|ვწერთ|შეტყობინ|сообщен|chat/u.test(text)) return 'chats';
+  return null;
+}
 export function exactChoice(s: IntakeState, message: string): Update | null {
   if (!s.currentQuestion) return null;
   const field = s.currentQuestion, text = message.trim();
@@ -76,7 +100,17 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   s.turn++; s.language = languageOf(message, s.language); s.complete = false; s.stopReason = null;
   s.history.push({ role: 'user', content: message });
   const control = isControlAnswer(message), direct = exactChoice(previous, message);
-  const updates = control ? [] : [...extraction.updates.filter((u) => u.field !== direct?.field), ...(direct ? [direct] : [])];
+  const modelUpdates = control ? [] : extraction.updates.filter((u) => u.field !== direct?.field);
+  // For an open, server-selected question, the customer's answer is already
+  // evidence for that field. Keep it verbatim if the extractor only marks it
+  // partial or misses it; never use this fallback for enum-based facts.
+  const current = previous.currentQuestion;
+  const openAnswer = current && BANK[current].options.length === 0 && !control && !direct && message.trim().length >= 6;
+  const modelConfirmedCurrent = current && modelUpdates.some((u) => u.field === current && ['confirmed', 'estimated'].includes(u.status));
+  const fallback = openAnswer && !modelConfirmedCurrent
+    ? [{ field: current, value: message.trim(), status: 'confirmed' as FactStatus, evidence: message.trim(), correction: false }]
+    : [];
+  const updates = [...modelUpdates, ...(direct ? [direct] : []), ...fallback];
   for (const u of updates) {
     if (!FIELDS.includes(u.field) || !u.evidence.trim() || !message.includes(u.evidence) || u.evidence.length > 600 || u.value.length > 400) continue;
     const options = BANK[u.field].options;
@@ -102,6 +136,15 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   }
   if (!control && ['discovery', 'growth'].includes(s.focus) && attributionHint(message)) {
     s.focus = 'attribution'; s.focusQuote = message.slice(0, 600);
+  }
+  const hintedFocus = focusHint(message);
+  // A direct first-turn product/process signal must beat a generic model route
+  // such as "operations". It must not overwrite a later, specific diagnosis.
+  const canApplyHint = s.focus === 'discovery'
+    || (s.focus === 'growth' && extraction.focus === 'discovery')
+    || (s.turn === 1 && ['growth', 'operations'].includes(s.focus));
+  if (!control && hintedFocus && canApplyHint) {
+    s.focus = hintedFocus; s.focusQuote = message.slice(0, 600);
   }
   const required = requiredFields(s);
   const exhausted = finish || s.turn >= MAX_AUDIT_TURNS;
@@ -133,24 +176,39 @@ export function intakeProgress(s: IntakeState) {
   return { covered: fields.filter((f) => usable(s, f)).length, gaps: fields.filter((f) => !usable(s, f)).length, complete: s.complete,
     phase: s.complete ? 'report' : s.focus === 'discovery' ? 'context' : fields.filter((f) => usable(s, f)).length < 6 ? 'diagnosis' : 'feasibility' };
 }
-export type Verdict = 'measurement_first' | 'process_first' | 'pilot' | 'prepare' | 'not_now' | 'insufficient';
+export type Verdict = 'measurement_first' | 'process_first' | 'pilot' | 'prepare' | 'not_now' | 'insufficient' | 'scoped_discovery' | 'technical_assessment' | 'human_service' | 'not_available';
 export function assess(s: IntakeState) {
   const evidence = requiredFields(s).filter((f) => usable(s, f));
-  const result = (verdict: Verdict, product: string | null = null, supported = false) => ({ verdict, product, opportunity: supported ? 'supported' : 'limited',
+  const result = (verdict: Verdict, product: ProductKey | null = null, supported = false) => ({ verdict, product, opportunity: supported ? 'supported' : 'limited',
     readiness: verdict !== 'measurement_first' && val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints')) ? 'ready' : 'limited', evidence });
   if (!usable(s, 'business') || !usable(s, 'pain')) return result('insufficient');
+  if (s.focus === 'fleet') return result('not_available');
   if (['minor', 'none'].includes(val(s, 'severity')) || val(s, 'alternative') === 'solved') return result('not_now');
   if (s.focus === 'attribution' && (['none', 'ask'].includes(val(s, 'attribution')) || ['missing', 'criteria'].includes(val(s, 'reporting_gap')) || ['no', 'partial'].includes(val(s, 'attribution_check')))) return result('measurement_first');
   if (s.focus === 'ads' && (['clicks', 'none'].includes(val(s, 'tracking')) || val(s, 'acquisition') === 'organic')) return result('measurement_first');
+  if (s.focus === 'calls' && ['cold', 'unclear'].includes(val(s, 'call_permission'))) return result('process_first');
   if (s.focus === 'growth') return result(usable(s, 'bottleneck') ? 'process_first' : 'insufficient');
   if (s.focus === 'attribution') return result(usable(s, 'reporting_gap') ? 'process_first' : 'insufficient');
-  if (val(s, 'repetition') === 'unique' || val(s, 'call_task') === 'expert' || val(s, 'docs_task') === 'decision'
+  if (val(s, 'call_task') === 'expert' || val(s, 'docs_task') === 'decision'
     || val(s, 'response') === 'fine' || ['approval', 'none'].includes(val(s, 'content_gap'))) return result('process_first');
-  const supported = BRANCH_FIELDS[s.focus].every((f) => usable(s, f)) && usable(s, 'process') && usable(s, 'scale') && usable(s, 'impact') && val(s, 'severity') === 'material' && ['repeatable', 'mixed'].includes(val(s, 'repetition'));
+  const hasMaterialCase = BRANCH_FIELDS[s.focus].every((f) => usable(s, f)) && usable(s, 'process') && usable(s, 'scale') && usable(s, 'impact') && val(s, 'severity') === 'material';
+  if (s.focus === 'staff') return hasMaterialCase && usable(s, 'owner') ? result('human_service', 'aiSTAFF', true) : result('insufficient');
+  if (s.focus === 'app') {
+    if (!hasMaterialCase) return result('insufficient');
+    if (!usable(s, 'data') || !usable(s, 'owner') || !usable(s, 'constraints')) return result('prepare', null, true);
+    return result('scoped_discovery', 'aiAPP', true);
+  }
+  if (s.focus === 'rescue') {
+    if (!hasMaterialCase) return result('insufficient');
+    if (!usable(s, 'data') || !usable(s, 'owner')) return result('prepare', null, true);
+    return result('technical_assessment', 'vibeCODING', true);
+  }
+  if (val(s, 'repetition') === 'unique') return result('process_first');
+  const supported = hasMaterialCase && ['repeatable', 'mixed'].includes(val(s, 'repetition'));
   if (!supported) return result('insufficient');
   if (val(s, 'constraints') === 'high_risk') return result('prepare', null, true);
   if (val(s, 'alternative') !== 'insufficient') return result('process_first', null, true);
   if (result('prepare').readiness !== 'ready') return result('prepare', null, true);
-  const products: Partial<Record<Focus, string>> = { chats: 'aiCHATS', calls: 'aiCALL', ads: 'aiADS', content: 'aiCONTENT', docs: 'aiDOCS', web: 'aiWEB' };
-  return products[s.focus] ? result('pilot', products[s.focus]!, true) : result('process_first', null, true);
+  const product = PRODUCT_FOR_FOCUS[s.focus];
+  return product && PRODUCT_CATALOG[product].mode === 'pilot' ? result('pilot', product, true) : result('process_first', null, true);
 }
