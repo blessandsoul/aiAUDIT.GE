@@ -95,6 +95,10 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
   if (a.product && a.verdict === 'pilot') next += ' ' + t('შემოთავაზებული სატესტო პერიოდი: 14 დღე. გაგრძელება მხოლოდ მაშინ, თუ დრო მცირდება და შეცდომების დონე არ უარესდება; სერიოზული შეცდომისას ტესტი შეჩერდეს.', 'Предлагаемый срок проверки: 14 дней. Продолжать, если время сокращается без ухудшения качества; при серьёзной ошибке остановить тест.', 'Proposed test duration: 14 days. Continue if time decreases without worse quality; stop the test on a serious error.');
   const gaps = requiredFields(s).filter((f) => !usable(s, f));
   const reference = (field: Field, label: string) => usable(s, field) ? `${label}: [${s.facts[field]!.id}] “${s.facts[field]!.quote}”` : '';
+  if (s.focus === 'ads' && a.verdict === 'measurement_first') {
+    next = t('აირჩიეთ ერთი კამპანია. შეამოწმეთ, უკავშირდება თუ არა რეალური შეძენა მის წყაროს. გამოიყენეთ სატესტო შეკვეთა და შეადარეთ რეკლამის ჩანაწერი მაღაზიის ჩანაწერს. წყაროს გარეშე დარჩენილი შეკვეთა ცალკე აღრიცხეთ. სანამ მონაცემი სანდო არ იქნება, AI-ით ბიუჯეტის მართვა არ დაიწყოთ.', 'Выберите одну кампанию. Проверьте, связывается ли реальная покупка с её источником: проведите тестовый заказ и сопоставьте запись рекламы с записью магазина. Заказы без источника учитывайте отдельно. До проверки данных не передавайте управление бюджетом AI.', 'Choose one campaign. Use a test order to verify that an actual purchase is linked to its source, then reconcile the advertising record with the store record. Count unattributed orders separately. Do not hand budget management to AI until the data are verified.');
+    metrics = t('წყაროსთან დაკავშირებული შეკვეთების წილი, წყაროს გარეშე დარჩენილი შეკვეთები და ჩანაწერებს შორის სხვაობა.', 'Доля заказов с установленным источником, заказы без источника и расхождения между системами.', 'Share of orders with an identified source, unattributed orders and discrepancies between systems.');
+  }
   const actionContext = [
     reference('pain', t('რა უნდა შეიცვალოს', 'Что должно измениться', 'What needs to change')),
     reference('impact', t('რატომ არის ეს მნიშვნელოვანი', 'Почему это важно', 'Why it matters')),
@@ -126,6 +130,11 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
     t('მტკიცებულება — თქვენი სიტყვები', 'Основания — ваши слова', 'Evidence — your words'), evidence(a.evidence.filter((f) => !['business', 'objective', 'priority_check', 'pain', 'impact', 'baseline', ...(a.product ? ['constraints', 'owner'] : [])].includes(f))),
     t('შეგიძლიათ შეასწოროთ ნებისმიერი ფაქტი — ანგარიში თავიდან შეფასდება.', 'Любой факт можно исправить — вывод будет пересмотрен.', 'You can correct any fact — the conclusion will be reassessed.'),
   ];
+  const pending = Object.values(s.facts).filter((fact) => fact?.previous && !usable(s, fact.field));
+  if (pending.length) sections.push(
+    t('პასუხები, რომლებიც დაზუსტებას საჭიროებს', 'Ответы, требующие уточнения', 'Statements requiring clarification'),
+    ...pending.map((fact) => `“${fact!.previous!.quote}” / “${fact!.quote}”`),
+    t('ეს მონაცემები დადასტურებულ მაჩვენებლებად არ გამოგვიყენებია.', 'Эти данные не использованы как подтверждённые показатели.', 'These values were not used as confirmed measurements.'));
   if (s.publicScan) {
     sections.push(t('საჯარო წყაროები — ცალკე კონტექსტი', 'Публичные источники — отдельный контекст', 'Public sources — separate context'),
       t('ეს ციტატები არ არის კლიენტის პასუხები და არ ზრდის პროდუქტის შეფასებას.', 'Эти цитаты не являются ответами клиента и не повышают оценку продукта.', 'These quotes are not client answers and do not increase product fit.'),

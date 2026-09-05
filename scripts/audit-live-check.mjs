@@ -16,7 +16,7 @@ const common = {
   baseline: 'ახლა ერთი ანგარიშის მომზადებას 6 საათი სჭირდება, ამას ყოველ კვირას ვზომავთ.',
   priority_check: 'ეს არის მთავარი პრიორიტეტი',
 };
-const cases = {
+export const cases = {
   attribution: {
     first: 'ვყიდით სპორტულ ტანსაცმელს ონლაინ. TikTok, Instagram და ინფლუენსერ მარკეტინგს ვიყენებთ. რთულია ინფლუენსერებისგან შემოსული ზუსტი გაყიდვების დათვლა.',
     answers: { ...common, objective: 'თითოეული ინფლუენსერის ეფექტიანობის ნათელი ანალიტიკა გვინდა.', pain: 'ინფლუენსერისგან შემოსულ შეკვეთას ვერ ვადგენთ და პარტნიორს შედეგით ვერ ვირჩევთ.', attribution: 'წყაროს არ ვაფიქსირებთ', reporting_gap: 'შეკვეთას წყარო არ ახლავს', reporting_decision: 'პარტნიორის შერჩევა ან შეცვლა' },
@@ -68,7 +68,7 @@ const cases = {
     expect: 'not_available',
   },
 };
-const selected = process.argv[2] ? [process.argv[2]] : Object.keys(cases);
+const selected = process.env.AUDIT_FIXTURES_ONLY === '1' ? [] : process.argv[2] ? [process.argv[2]] : Object.keys(cases);
 for (const name of selected) {
   const fixture = cases[name]; let state; let message = fixture.first; const visited = [];
   for (let i = 0; i < 25; i++) {

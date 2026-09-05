@@ -18,6 +18,23 @@ export const known = (f?: Fact) => Boolean(f && ['confirmed', 'estimated'].inclu
 const settled = (f?: Fact) => Boolean(f && !['partial', 'contradicted'].includes(f.status));
 export const usable = (s: IntakeState, f: Field) => known(s.facts[f]);
 export const val = (s: IntakeState, f: Field) => usable(s, f) ? s.facts[f]!.value : '';
+const quantitativeFields: Field[] = ['scale', 'impact', 'baseline', 'conversion'];
+// A changed quantity is a clarification candidate, not automatically a factual
+// contradiction: periods, units or channels may differ. Never silently replace it.
+function changedQuantity(old: Fact, update: Update): boolean {
+  const numbers = (value: string) => [...new Set(value.match(/\d+(?:[.,]\d+)?/gu) || [])].sort().join('|');
+  const before = numbers(old.value), after = numbers(update.value);
+  const units = (value: string) => [
+    /daily|per day|\/day|в день|сутк|დღე/iu,
+    /weekly|per week|\/week|недел|კვირ/iu,
+    /monthly|per month|\/month|месяц|თვე/iu,
+    /hours?|час|საათ/iu, /minutes?|минут|წუთ/iu, /%|percent|процент|პროცენტ/iu,
+    /messages?|сообщен|შეტყობინ/iu, /leads?|лид|ლიდ/iu,
+  ].map((pattern,i)=>pattern.test(value)?String(i):'').filter(Boolean).join('|');
+  const oldUnits = units(old.value), newUnits = units(update.value);
+  return quantitativeFields.includes(update.field) && Boolean(before)
+    && (before !== after || (Boolean(oldUnits) && oldUnits !== newUnits));
+}
 export function createIntakeState(language: Language = 'ka'): IntakeState {
   return { version: 2, turn: 0, language, focus: 'discovery', focusQuote: '', facts: {}, asked: {}, currentQuestion: null, complete: false, stopReason: null, history: [] };
 }
@@ -33,6 +50,12 @@ export function languageOf(text: string, previous: Language = 'ka'): Language {
   return previous;
 }
 export function requiredFields(s: IntakeState): Field[] {
+  return [...new Set<Field>([...requiredBase(s), ...(val(s, 'priority_check') === 'another' ? ['area' as Field] : [])])];
+}
+function requiredBase(s: IntakeState): Field[] {
+  if (s.focus === 'discovery' && val(s, 'severity') === 'none') return ['business', 'objective', 'severity', 'priority_check'];
+  if (s.focus === 'discovery' && settled(s.facts.area) && !usable(s, 'area')) return ['business', 'objective', 'area', 'priority_check'];
+  if (s.focus === 'ads' && ['none', 'clicks'].includes(val(s, 'tracking'))) return ['business', 'objective', 'acquisition', 'tracking', 'systems', 'owner', 'priority_check'];
   let branch = [...BRANCH_FIELDS[s.focus]];
   if (s.focus === 'growth') {
     if (['reach', 'enquiries'].includes(val(s, 'bottleneck'))) branch = ['bottleneck', 'acquisition', 'conversion'];
@@ -54,7 +77,9 @@ export function questionFor(s: IntakeState): { field: Field; content: string; su
   if (s.complete || !s.currentQuestion) return null;
   const field = s.currentQuestion, fact = s.facts[field], question = BANK[field];
   let content = question.text[s.language];
-  if (fact?.status === 'contradicted' && fact.previous) {
+  if (fact?.previous && fact.status === 'partial') {
+    content = l(`ადრე თქვით: „${fact.previous.quote}“, ახლა კი: „${fact.quote}“. ეს შესწორებაა თუ სხვადასხვა პერიოდს ან პროცესს გულისხმობთ?`, `Ранее: «${fact.previous.quote}». Сейчас: «${fact.quote}». Это исправление или речь о разных периодах либо процессах?`, `Earlier: “${fact.previous.quote}”. Now: “${fact.quote}”. Is this a correction, or do these describe different periods or processes?`)[s.language];
+  } else if (fact?.status === 'contradicted' && fact.previous) {
     content = l(`ადრე თქვით: „${fact.previous.quote}“, ახლა კი: „${fact.quote}“. რომელი აღწერს ამჟამინდელ მდგომარეობას?`, `Ранее: «${fact.previous.quote}». Сейчас: «${fact.quote}». Что описывает текущее положение?`, `Earlier: “${fact.previous.quote}”. Now: “${fact.quote}”. Which describes the current situation?`)[s.language];
   } else if ((s.asked[field] ?? 0) > 1) {
     content += ' ' + l('შეგიძლიათ დაწეროთ შეფასება ან აირჩიოთ „არ ვიცი“.', 'Можно дать оценку или выбрать «Не знаю».', 'An estimate is fine, or choose “I don’t know”.')[s.language];
@@ -124,12 +149,16 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     if (['confirmed', 'estimated'].includes(u.status) && options.length && !options.some((o) => o.value === u.value)) continue;
     if (['unknown', 'declined', 'not_applicable'].includes(u.status) && u.field !== previous.currentQuestion) continue;
     const old = s.facts[u.field];
-    const resolving = old?.status === 'contradicted' && previous.currentQuestion === u.field;
+    const pending = old && (old.status === 'contradicted' || (old.status === 'partial' && old.previous));
+    const resolving = pending && previous.currentQuestion === u.field;
     const correction = resolving || (u.correction && /შესწორ|შეცდომ|არა[, ]|სინამდვილ|исправ|ошиб|не .+ а |на самом|correction|actually|meant|instead/iu.test(message));
     const conflict = old && known(old) && options.length > 0 && ['confirmed', 'estimated'].includes(u.status) && old.value !== u.value && !correction;
+    const quantityReview = old && known(old) && ['confirmed', 'estimated'].includes(u.status) && changedQuantity(old, u) && !correction;
+    if (pending && !correction && ['confirmed', 'estimated'].includes(u.status)) continue;
     if (old && known(old) && !['confirmed', 'estimated', 'contradicted'].includes(u.status) && !correction) continue;
-    s.facts[u.field] = { id: `${u.field}:${s.turn}`, field: u.field, value: ['confirmed', 'estimated', 'contradicted'].includes(u.status) ? u.value : '', status: conflict ? 'contradicted' : u.status, quote: u.evidence, turn: s.turn,
-      ...((conflict || u.status === 'contradicted') && old ? { previous: { value: old.value, quote: old.quote } } : {}),
+    if (quantityReview || conflict) s.asked[u.field] = 0;
+    s.facts[u.field] = { id: `${u.field}:${s.turn}`, field: u.field, value: ['confirmed', 'estimated', 'contradicted'].includes(u.status) ? u.value : '', status: conflict ? 'contradicted' : quantityReview ? 'partial' : u.status, quote: u.evidence, turn: s.turn,
+      ...((quantityReview || conflict || u.status === 'contradicted') && old ? { previous: { value: old.value, quote: old.quote } } : {}),
     };
   }
   const selectedArea = s.facts.area;
@@ -155,7 +184,8 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   }
   // A switch of investigated process invalidates old process-specific evidence.
   // Current-message evidence can establish the new process; business context stays.
-  if (previous.focus !== 'discovery' && s.focus !== previous.focus) {
+  const revisitingProcess = previous.currentQuestion === 'area' && val(previous, 'priority_check') === 'another' && known(s.facts.area);
+  if ((previous.focus !== 'discovery' && s.focus !== previous.focus) || revisitingProcess) {
     const context: Field[] = ['business', 'objective', 'channels', 'area'];
     for (const field of FIELDS) if (!context.includes(field)) {
       if (s.facts[field]?.turn !== s.turn || s.facts[field]?.status === 'contradicted') delete s.facts[field];
@@ -170,21 +200,24 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     // respondent while preserving the first off-topic answer's no-progress rule.
     s.asked[previous.currentQuestion] = Math.max(2, s.asked[previous.currentQuestion] || 0);
   }
+  if (previous.currentQuestion === 'priority_check' && direct?.value === 'another') {
+    delete s.facts.area; s.asked.area = 0;
+  }
   const required = requiredFields(s);
   const exhausted = finish || s.turn >= MAX_AUDIT_TURNS;
   const considered = (f: Field) => settled(s.facts[f]) || (s.asked[f] ?? 0) >= 2;
-  const ready = s.focus !== 'discovery' && required.every(considered) && val(s, 'priority_check') !== 'another';
+  const ready = required.every(considered) && (val(s, 'priority_check') !== 'another' || considered('area'));
   if (ready || exhausted) {
     s.complete = true; s.stopReason = exhausted || required.some((f) => !usable(s, f)) ? 'limited' : 'enough'; s.currentQuestion = null;
     return s;
   }
   const missing = required.filter((f) => !considered(f));
-  const conflict = missing.find((f) => s.facts[f]?.status === 'contradicted');
+  const conflict = missing.find((f) => s.facts[f]?.status === 'contradicted' || s.facts[f]?.previous);
   const essential = missing.find((f) => BRANCH_FIELDS[s.focus].includes(f));
   const basics = missing.find((f) => ['business', 'objective'].includes(f));
   let target: Field = basics ?? conflict ?? essential ?? missing[0] ?? 'area';
   if (!basics && !conflict && !essential && extraction.nextField && missing.slice(0, 3).includes(extraction.nextField)) target = extraction.nextField;
-  if (val(s, 'priority_check') === 'another') target = 'area';
+  if (val(s, 'priority_check') === 'another' && !considered('area')) target = 'area';
   s.currentQuestion = target; s.asked[target] = (s.asked[target] ?? 0) + 1;
   return s;
 }
@@ -206,6 +239,8 @@ export function assess(s: IntakeState) {
   const result = (verdict: Verdict, product: ProductKey | null = null, supported = false) => ({ verdict, product, opportunity: supported ? 'supported' : 'limited',
     readiness: verdict !== 'measurement_first' && val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints')) ? 'ready' : 'limited', evidence });
   if (s.focus === 'fleet') return result('not_available');
+  if (usable(s, 'business') && ['minor', 'none'].includes(val(s, 'severity'))) return result('not_now');
+  if (usable(s, 'business') && s.focus === 'ads' && ['clicks', 'none'].includes(val(s, 'tracking'))) return result('measurement_first');
   if (!usable(s, 'business') || !usable(s, 'pain')) return result('insufficient');
   if (['minor', 'none'].includes(val(s, 'severity')) || val(s, 'alternative') === 'solved') return result('not_now');
   if (s.focus === 'attribution' && (['none', 'ask'].includes(val(s, 'attribution')) || ['missing', 'criteria'].includes(val(s, 'reporting_gap')) || ['no', 'partial'].includes(val(s, 'attribution_check')))) return result('measurement_first');
@@ -215,6 +250,7 @@ export function assess(s: IntakeState) {
   if (s.focus === 'attribution') return result(usable(s, 'reporting_gap') ? 'process_first' : 'insufficient');
   if (val(s, 'call_task') === 'expert' || val(s, 'docs_task') === 'decision'
     || val(s, 'response') === 'fine' || ['approval', 'none'].includes(val(s, 'content_gap'))) return result('process_first');
+  if (requiredFields(s).some((f) => s.facts[f]?.previous && !usable(s, f))) return result('insufficient');
   const hasMaterialCase = BRANCH_FIELDS[s.focus].every((f) => usable(s, f)) && usable(s, 'process') && usable(s, 'scale') && usable(s, 'impact') && val(s, 'severity') === 'material';
   if (s.focus === 'staff') return hasMaterialCase && usable(s, 'owner') ? result('human_service', 'aiSTAFF', true) : result('insufficient');
   if (s.focus === 'app') {

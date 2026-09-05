@@ -3,7 +3,7 @@ import type { IntakeState } from './audit-engine.ts';
 function signingKey() {
   const key = process.env.AUDIT_SESSION_SECRET || process.env.CHAT_API_KEY;
   if (!key || key.length < 24) throw new Error('Audit signing is not configured');
-  return createHmac('sha256', key).update('aiaudit-evidence-repair-v3').digest();
+  return createHmac('sha256', key).update('aiaudit-evidence-repair-v4').digest();
 }
 function digest(s: IntakeState, timestamp: string) {
   const { proof: _proof, ...payload } = s;
