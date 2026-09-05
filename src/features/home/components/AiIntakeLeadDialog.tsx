@@ -30,7 +30,6 @@ function isValidPhone(value: string): boolean {
 export function AiIntakeLeadDialog({
   open,
   onOpenChange,
-  messages,
   intakeState,
   onSubmitted,
 }: AiIntakeLeadDialogProps) {
@@ -68,7 +67,8 @@ export function AiIntakeLeadDialog({
           phone,
           consent,
           website: '',
-          messages: messages.map(({ role, content }) => ({ role, content })),
+          // The server rebuilds the complete report/transcript from signed state.
+          messages: intakeState.history.slice(-2),
           intakeState,
         }),
       });

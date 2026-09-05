@@ -4,6 +4,7 @@ import { BANK, FIELDS, FOCUSES, type Field } from '@/lib/audit-bank';
 import { advanceAudit, assess, createIntakeState, exactChoice, intakeProgress, isControlAnswer, languageOf, publicFactSummary, questionFor, requiredFields, type Extraction, type IntakeState } from '@/lib/audit-engine';
 import { buildFinalBrief } from '@/lib/audit-report';
 import { signState, verifyState } from '@/lib/audit-session';
+import { readAuditBody, AuditRequestTooLarge } from '@/lib/audit-request';
 
 const fieldSchema = z.enum(FIELDS as [Field, ...Field[]]);
 const extractionSchema = z.object({
@@ -81,8 +82,7 @@ export async function POST(request: NextRequest) {
   if (origin && origin !== new URL(request.url).origin && origin !== process.env.NEXT_PUBLIC_SITE_URL) return NextResponse.json({ error: 'Origin rejected' }, { status: 403 });
   if (limited(request)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   try {
-    const bytes = await request.text();
-    if (Buffer.byteLength(bytes) > 350_000) return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    const bytes = await readAuditBody(request);
     const input = JSON.parse(bytes) as { messages?: unknown; intakeState?: unknown; action?: string; thinking?: unknown };
     if (input.thinking !== undefined && typeof input.thinking !== 'boolean') return NextResponse.json({ error: 'Invalid thinking mode' }, { status: 400 });
     const last = Array.isArray(input.messages) ? input.messages.at(-1) : null;
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
     next.history.push({ role: 'assistant', content: next.complete ? 'Quick Audit report provided. The client may correct facts.' : content });
     return NextResponse.json({ content, suggestions: question?.suggestions || [], analysis: publicFactSummary(next), intakeState: signState(next), progress: intakeProgress(next), assessment: next.complete ? assess(next) : null });
   } catch (error) {
+    if (error instanceof AuditRequestTooLarge) return NextResponse.json({error:'Request too large'},{status:413});
     // No fabricated fallback progress after a provider error; retry the same turn.
     console.warn('Audit turn rejected:', error instanceof Error ? error.message.slice(0, 350) : 'invalid response');
     return NextResponse.json({ error: 'Could not process this answer. Please retry.' }, { status: 503 });

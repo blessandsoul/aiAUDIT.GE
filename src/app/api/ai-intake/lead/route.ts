@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyState } from '@/lib/audit-session';
+import { readAuditBody, AuditRequestTooLarge } from '@/lib/audit-request';
 
 import {
   buildIntakeLeadTelegramMessages,
@@ -50,8 +51,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   try {
-    const body = await request.text();
-    if (Buffer.byteLength(body) > 350_000) return NextResponse.json({ error: 'Request too large.' }, { status: 413 });
+    const body = await readAuditBody(request);
     const parsed = leadSchema.safeParse(JSON.parse(body));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid lead data.' }, { status: 400 });
@@ -72,7 +72,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     });
     await sendIntakeLeadToTelegram(chunks);
     return NextResponse.json({ ok: true, leadId });
-  } catch {
+  } catch (error) {
+    if (error instanceof AuditRequestTooLarge) return NextResponse.json({error:'Request too large.'},{status:413});
     return NextResponse.json({ error: 'Lead delivery failed.' }, { status: 503 });
   }
 }

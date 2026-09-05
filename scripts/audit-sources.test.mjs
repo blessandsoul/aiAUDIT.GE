@@ -1,5 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readAuditBody, AuditRequestTooLarge} from '../src/lib/audit-request.ts';
+
+test('audit body allows bounded social state and rejects oversize streams', async()=>{
+  const text='ა'.repeat(150000);
+  assert.equal(await readAuditBody(new Request('https://test.invalid',{method:'POST',body:text})),text);
+  await assert.rejects(readAuditBody(new Request('https://test.invalid',{method:'POST',body:'x'.repeat(1000001)})),AuditRequestTooLarge);
+});
 import { publicUrl, publicIPv4, robotsAllowed, pageText, relatedPages, scanPage } from '../src/lib/audit-public-fetch.ts';
 import { validateObservations } from '../src/lib/audit-public-sources.ts';
 import { createIntakeState, advanceAudit, assess } from '../src/lib/audit-engine.ts';
@@ -46,6 +53,10 @@ test('social run caps, persistent reservations and cache prevent repeated paid r
     await assert.rejects(scanSocial('https://instagram.com/anotherbusiness')); assert.equal(starts,2);
     const day=new Date().toISOString().slice(0,10);
     assert.equal(JSON.parse(await readFile(join(root,`budget-${day}.json`),'utf8')).reserved,.24);
+    process.env.AUDIT_SOCIAL_DAILY_USD='1';
+    await Promise.all([scanSocial('https://instagram.com/parallelone'),scanSocial('https://instagram.com/paralleltwo')]);
+    assert.equal(starts,6);
+    assert.equal(JSON.parse(await readFile(join(root,`budget-${day}.json`),'utf8')).reserved,.72);
   } finally {
     globalThis.fetch=old.fetch;
     for(const [key,value] of [['APIFY_TOKEN',old.token],['AUDIT_SOURCE_STORE',old.store],['AUDIT_SOCIAL_DAILY_USD',old.budget]]) {if(value===undefined)delete process.env[key];else process.env[key]=value;}

@@ -23,7 +23,8 @@
 
 ## Observed local evidence
 
-- 47/47 unit/source/security tests passed, including finalized speech deduplication.
+- 48/48 unit/source/security tests passed, including finalized speech deduplication,
+  large bounded request bodies and concurrent budget reservations.
 - Production build passed (40 pages). Earlier font fetch failed transiently;
   retry succeeded. Build is not proof of browser/device compatibility.
 - Live model scenarios: growth -> process_first (10 turns), clinic -> aiCHATS
@@ -39,7 +40,26 @@
   disconnected during the final pass. Physical microphone audio is untested.
 - Fleet live fixture initially looped, then exposed missing fixture coverage for
   a discovery question. Repeated-answer and explicit unavailable-fleet routing
-  received regression tests; the complete live fleet fixture remains to re-run.
+  received regression tests; the final live fleet fixture passed in 13 turns with
+  not_available, no product and explicit information gaps.
+
+## Follow-up hardening
+
+The original 350 KB request bound and duplicated rendered report could reject a
+large social sample at contact submission. Intake/lead now enforce a 1 MB bound
+while reading the stream; the client sends only the final signed history pair,
+and the server reconstructs the complete report/transcript from signed state.
+Concurrent social reservations now wait at most 500 ms for the filesystem lock
+instead of rejecting the second network. Stale locks still fail closed.
+
+## First production rollout
+
+88377d4 deployed through Coolify 5de70647-42af-4a50-b858-3a4a8f33f42c: finished,
+matching image healthy. HTTPS returned 200 and microphone=(self); high-reasoning
+clinic request returned 200, chats focus and relevant evidence. A live scan job
+returned 10 Instagram posts, zero accepted comments and four validated quotes.
+Instagram run TPY2AKKTjt4LkWuDl; receipt 1788613241481-feebc949e3d43e00.
+The combined first scan exposed the concurrent-reservation rejection fixed above.
 
 ## Remaining acceptance
 

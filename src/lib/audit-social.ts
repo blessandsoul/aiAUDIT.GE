@@ -7,6 +7,18 @@ import type { PublicSource } from './audit-public-sources.ts';
 // they are never refunded on ambiguous provider outcomes. No automatic retries.
 const CAP = 0.24; // per network: posts <= .06, comments <= .18
 const TTL = 2 * 60 * 60 * 1000;
+async function budgetFileLock(path: string) {
+  // Two networks may reserve concurrently. Wait only for the local critical
+  // section, never retry a paid provider call or remove another process's lock.
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try { return await open(path, 'wx'); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+  throw new Error('Budget reservation busy');
+}
 export function socialProfile(raw: string): { network: 'instagram' | 'facebook'; url: string; handle: string } | null {
   const u = new URL(raw), host = u.hostname.replace(/^www\./, '');
   if (!['instagram.com', 'facebook.com'].includes(host)) return null;
@@ -83,7 +95,7 @@ export async function scanSocial(raw: string): Promise<PublicSource[]> {
   let started = false;
   try {
     const day = new Date().toISOString().slice(0,10);
-    const budgetLock = await open(join(root, 'budget.lock'), 'wx');
+    const budgetLock = await budgetFileLock(join(root, 'budget.lock'));
     try {
       const file = join(root, `budget-${day}.json`);
       let spent = 0;
