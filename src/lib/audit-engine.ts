@@ -1,5 +1,6 @@
 import { BANK, BRANCH_FIELDS, DECLINED, FIELDS, FOCUSES, UNKNOWN, l, type Field, type Focus, type Language } from './audit-bank.ts';
 import { PRODUCT_CATALOG, PRODUCT_FOR_FOCUS, type ProductKey } from './audit-product-catalog.ts';
+import type { PublicScan } from './audit-public-sources.ts';
 export type IntakeLanguage = Language;
 export type FactStatus = 'confirmed' | 'estimated' | 'partial' | 'unknown' | 'declined' | 'not_applicable' | 'contradicted';
 export type Fact = { id: string; field: Field; value: string; status: FactStatus; quote: string; turn: number; previous?: { value: string; quote: string } };
@@ -8,6 +9,7 @@ export type IntakeState = {
   facts: Partial<Record<Field, Fact>>; asked: Partial<Record<Field, number>>;
   currentQuestion: Field | null; complete: boolean; stopReason: 'enough' | 'limited' | null;
   history: Array<{ role: 'user' | 'assistant'; content: string }>; proof?: string;
+  publicScan?: PublicScan;
 };
 export type Update = { field: Field; value: string; status: FactStatus; evidence: string; correction: boolean };
 export type Extraction = { focus: Focus; focusEvidence: string; updates: Update[]; nextField: Field | null };
@@ -146,7 +148,8 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   const hintedFocus = focusHint(message);
   // A direct first-turn product/process signal must beat a generic model route
   // such as "operations". It must not overwrite a later, specific diagnosis.
-  const canApplyHint = s.turn === 1 && s.focus === 'operations' && hintedFocus === 'office';
+  const canApplyHint = s.turn === 1 && ((s.focus === 'operations' && hintedFocus === 'office')
+    || (s.focus === 'discovery' && hintedFocus === 'fleet'));
   if (!control && hintedFocus && canApplyHint) {
     s.focus = hintedFocus; s.focusQuote = message.slice(0, 600);
   }
@@ -161,8 +164,11 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   }
   // An unrelated answer must not consume a question attempt or advance the interview.
   if (!finish && s.turn < MAX_AUDIT_TURNS && previous.currentQuestion && s.focus === previous.focus && !updates.length && !control) {
-    s.currentQuestion = previous.currentQuestion;
-    return s;
+    const repeated = previous.history.filter((item) => item.role === 'user').at(-1)?.content.trim() === message.trim();
+    if (!repeated) { s.currentQuestion = previous.currentQuestion; return s; }
+    // A repeated unanswered statement is a gap, not evidence. Avoid trapping the
+    // respondent while preserving the first off-topic answer's no-progress rule.
+    s.asked[previous.currentQuestion] = Math.max(2, s.asked[previous.currentQuestion] || 0);
   }
   const required = requiredFields(s);
   const exhausted = finish || s.turn >= MAX_AUDIT_TURNS;
@@ -199,8 +205,8 @@ export function assess(s: IntakeState) {
   const evidence = requiredFields(s).filter((f) => usable(s, f));
   const result = (verdict: Verdict, product: ProductKey | null = null, supported = false) => ({ verdict, product, opportunity: supported ? 'supported' : 'limited',
     readiness: verdict !== 'measurement_first' && val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints')) ? 'ready' : 'limited', evidence });
-  if (!usable(s, 'business') || !usable(s, 'pain')) return result('insufficient');
   if (s.focus === 'fleet') return result('not_available');
+  if (!usable(s, 'business') || !usable(s, 'pain')) return result('insufficient');
   if (['minor', 'none'].includes(val(s, 'severity')) || val(s, 'alternative') === 'solved') return result('not_now');
   if (s.focus === 'attribution' && (['none', 'ask'].includes(val(s, 'attribution')) || ['missing', 'criteria'].includes(val(s, 'reporting_gap')) || ['no', 'partial'].includes(val(s, 'attribution_check')))) return result('measurement_first');
   if (s.focus === 'ads' && (['clicks', 'none'].includes(val(s, 'tracking')) || val(s, 'acquisition') === 'organic')) return result('measurement_first');

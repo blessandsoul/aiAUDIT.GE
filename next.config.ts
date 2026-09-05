@@ -63,7 +63,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // max-age 1y, no preload: preload is near-irreversible, enable only after a clean month
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
           // Clean CSP: self + Google Fonts only (GTM / Facebook origins removed with the analytics strip).
           {
             key: "Content-Security-Policy-Report-Only",

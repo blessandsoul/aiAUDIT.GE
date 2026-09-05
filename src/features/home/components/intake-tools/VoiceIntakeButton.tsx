@@ -1,132 +1,60 @@
 'use client';
-
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Ico } from '@/components/common/Ico';
-
-type RecognitionEvent = {
-  resultIndex: number;
-  results: ArrayLike<ArrayLike<{ transcript: string }>>;
-};
-
+import { finalDictation, type DictationEvent as RecognitionEvent } from '@/lib/audit-dictation';
 type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: RecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
+  lang: string; continuous: boolean; interimResults: boolean;
+  onstart: (() => void) | null; onresult: ((event: RecognitionEvent) => void) | null;
+  onerror: ((event: { error: string }) => void) | null; onend: (() => void) | null;
+  start: () => void; stop: () => void; abort: () => void;
 };
-
-type RecognitionConstructor = new () => Recognition;
-type RecognitionWindow = Window & typeof globalThis & {
-  SpeechRecognition?: RecognitionConstructor;
-  webkitSpeechRecognition?: RecognitionConstructor;
-};
-
-interface VoiceIntakeButtonProps {
-  onTranscript: (text: string) => void;
-  className?: string;
-}
-
-export function VoiceIntakeButton({
-  onTranscript,
-  className = '',
-}: VoiceIntakeButtonProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordDuration, setRecordDuration] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+type Props = { onTranscript: (text: string) => void; onStatus?: (text: string) => void; language?: 'ka' | 'ru' | 'en'; disabled?: boolean; className?: string };
+export function VoiceIntakeButton({ onTranscript, onStatus, language = 'ka', disabled = false, className = '' }: Props) {
+  const [recording, setRecording] = useState(false);
   const recognitionRef = useRef<Recognition | null>(null);
-
-  const startListening = () => {
-    setIsRecording(true);
-    setRecordDuration(0);
-
-    timerRef.current = setInterval(() => {
-      setRecordDuration((prev) => prev + 1);
-    }, 1000);
-
-    const speechWindow = window as RecognitionWindow;
-    const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'ka-GE';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onresult = (event) => {
-          let currentTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            currentTranscript += event.results[i][0].transcript;
-          }
-          if (currentTranscript.trim()) {
-            onTranscript(currentTranscript);
-          }
-        };
-
-        recognition.onerror = () => {
-          stopListening();
-        };
-
-        recognition.onend = () => {
-          stopListening();
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-      } catch (err) {
-        console.warn('SpeechRecognition error:', err);
-      }
-    } else {
-      stopListening();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callbacks = useRef({ onTranscript, onStatus });
+  useEffect(() => { callbacks.current = { onTranscript, onStatus }; }, [onTranscript, onStatus]);
+  function clear() { if (timer.current) clearTimeout(timer.current); timer.current = null; }
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+    const r = recognitionRef.current;
+    if (r) { r.onend = null; r.onerror = null; r.onresult = null; r.onstart = null; r.abort(); }
+  }, []);
+  useEffect(() => { if (disabled) recognitionRef.current?.stop(); }, [disabled]);
+  function toggle() {
+    if (recognitionRef.current) { recognitionRef.current.stop(); return; }
+    const speech = window as typeof window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
+    const Constructor = speech.SpeechRecognition || speech.webkitSpeechRecognition;
+    if (!Constructor || !window.isSecureContext) {
+      callbacks.current.onStatus?.('ამ ბრაუზერში ხმოვანი შეყვანა მიუწვდომელია. გამოიყენეთ კლავიატურის მიკროფონი ან აკრიფეთ პასუხი.'); return;
     }
-  };
-
-  const stopListening = () => {
-    setIsRecording(false);
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {}
-      recognitionRef.current = null;
-    }
-  };
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  };
-
-  return (
-    <div className="relative inline-flex items-center">
-      <button
-        type="button"
-        onClick={toggleRecording}
-        className={`heroRoundBtn ${isRecording ? 'bg-red-50 text-red-600 border-red-300' : ''} ${className}`}
-        title={isRecording ? 'ჩაწერის შეჩერება' : 'ხმოვანი შეტყობინება (ქართულად)'}
-        aria-label={isRecording ? 'ხმოვანი ჩაწერის შეჩერება' : 'ხმოვანი შეტყობინების დაწყება'}
-      >
-        <Ico
-          name="solar:microphone-3-bold-duotone"
-          className={`size-4 ${isRecording ? 'animate-pulse text-red-600' : 'text-slate-600'}`}
-        />
-      </button>
-
-      {isRecording && (
-        <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm animate-bounce">
-          🎙️ ჩაწერა... 0:0{recordDuration}
-        </span>
-      )}
-    </div>
-  );
+    const r = new Constructor();
+    let received = false, failed = false;
+    const delivered = new Set<number>();
+    r.lang = { ka: 'ka-GE', ru: 'ru-RU', en: 'en-US' }[language];
+    r.continuous = false; r.interimResults = true;
+    r.onstart = () => { setRecording(true); callbacks.current.onStatus?.('გისმენთ… ტექსტი გაგზავნამდე შეამოწმეთ.'); };
+    r.onresult = (event) => {
+      for (const text of finalDictation(event, delivered)) { received = true; callbacks.current.onTranscript(text); }
+    };
+    r.onerror = (event) => {
+      failed = true;
+      callbacks.current.onStatus?.(event.error === 'not-allowed' || event.error === 'service-not-allowed'
+        ? 'მიკროფონზე წვდომა არ არის დაშვებული. შეამოწმეთ ბრაუზერის ნებართვა ან აკრიფეთ პასუხი.'
+        : 'ხმის ამოცნობა ვერ მოხერხდა. სცადეთ ხელახლა ან გამოიყენეთ კლავიატურის მიკროფონი.');
+      clear(); setRecording(false); recognitionRef.current = null;
+    };
+    r.onend = () => {
+      clear(); setRecording(false); recognitionRef.current = null;
+      if (!failed) callbacks.current.onStatus?.(received ? 'ტექსტი დამატებულია. შეამოწმეთ და შემდეგ გაგზავნეთ.' : 'საუბარი ვერ ამოვიცანით. სცადეთ ხელახლა ან აკრიფეთ პასუხი.');
+    };
+    recognitionRef.current = r;
+    try { r.start(); timer.current = setTimeout(() => r.stop(), 60_000); }
+    catch { clear(); recognitionRef.current = null; setRecording(false); callbacks.current.onStatus?.('მიკროფონის ჩართვა ვერ მოხერხდა. შეამოწმეთ ბრაუზერის ნებართვა.'); }
+  }
+  return <button type="button" disabled={disabled} onClick={toggle} className={`heroRoundBtn ${className}`} aria-pressed={recording}
+    aria-label={recording ? 'ხმოვანი ჩაწერის შეჩერება' : 'ხმოვანი შეტყობინების დაწყება'} title={recording ? 'ჩაწერის შეჩერება' : `ხმოვანი შეყვანა · ${language.toUpperCase()}`}>
+    <Ico name="solar:microphone-3-bold-duotone" className={`size-4 ${recording ? 'text-red-600 animate-pulse' : 'text-slate-600'}`} />
+  </button>;
 }

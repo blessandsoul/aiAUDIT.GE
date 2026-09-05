@@ -13,13 +13,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { MessageSquare, Target, FileText, Zap, ChevronDown } from 'lucide-react';
 import { BorderBeam } from 'border-beam';
 import type { IntakeState } from '@/lib/ai-intake-controller';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
+
 import './hero-ai-chat.css';
 
 /* Color interpolation helpers ported from iAI OS */
@@ -154,7 +148,8 @@ export function HeroLiquidOrb({
 export function HeroAiChat() {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const orbAccent = '#10b981';
+  const [voiceStatus, setVoiceStatus] = useState('');
+  const orbAccent = '#4f46e5';
   const [isChatMode, setIsChatMode] = useState(false);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [intakeState, setIntakeState] = useState<IntakeState | null>(null);
@@ -240,7 +235,6 @@ export function HeroAiChat() {
       content,
     };
     const assistantId = `assistant-${Date.now()}`;
-    const requestMessages = [...conversation, userMessage];
     composerTopBeforeChatRef.current = composerRef.current?.getBoundingClientRect().top ?? null;
 
     setConversation((current) => [
@@ -262,12 +256,11 @@ export function HeroAiChat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: requestMessages.map(({ role, content: messageContent }) => ({
-            role,
-            content: messageContent,
-          })),
+          // Prior turns already live in the signed state; do not duplicate them.
+          messages: [{ role: userMessage.role, content }],
           intakeState,
           action,
+          thinking,
         }),
         signal: controller.signal,
       });
@@ -369,7 +362,7 @@ export function HeroAiChat() {
                 <span className="heroIntroHighlight">ნამდვილად სასარგებლო</span> თქვენი ბიზნესისთვის
               </h1>
               <p className="heroIntroLead">
-                მოგვიყევით თქვენი კომპანიის საქმიანობის შესახებ. ჩვენი AI სისტემა გააანალიზებს ოპერაციულ ხარვეზებს, დასვამს საჭირო კითხვებს და შეარჩევს ზუსტ, გაზომვად გადაწყვეტას.
+                დაამატეთ საიტი ან მოგვიყევით თქვენი ბიზნესის შესახებ. შევამოწმებთ საჯარო ინფორმაციას, დავაზუსტებთ პროცესებს და შევაფასებთ, სად აქვს AI-ს რეალური ღირებულება.
               </p>
             </motion.div>
           ) : null}
@@ -425,62 +418,24 @@ export function HeroAiChat() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   rows={2}
+                  maxLength={3000}
+                  aria-label="თქვენი პასუხი"
                   placeholder="მაგ: გვაქვს სადისტრიბუციო კომპანია, გვინდა შეკვეთების დამუშავებისა და CRM-ის აუდიტი..."
                   className="heroTextarea"
                 />
-                <p className="heroInputHint">მოკლედ აღწერეთ პროცესები. AI შეაფასებს მიზანშეწონილობას და დააზუსტებს მხოლოდ საჭირო დეტალებს.</p>
+                <p className="heroInputHint">{isChatMode ? 'უპასუხეთ საკუთარი სიტყვებით. თუ არ იცით, შეგიძლიათ გამოტოვოთ.' : 'დაიწყეთ აღწერით ან დაამატეთ ბმულები ქვემოთ. საიტი აუცილებელი არ არის.'}</p>
 
                 <div className="heroComposerFooter">
                   {/* Left Controls */}
                   <div className="heroComposerLeft">
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <button type="button" className="heroRoundBtn" title="აუდიტის წყაროები">
-                          <Ico name="solar:add-circle-bold-duotone" className="size-4.5 text-slate-600" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" side="bottom" sideOffset={8} className="w-72 p-1.5 rounded-xl border border-slate-200 bg-white shadow-2xl z-[999999]">
-                        <DropdownMenuLabel className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-2 py-1">
-                          აუდიტის წყაროები &amp; მონაცემები
-                        </DropdownMenuLabel>
-                        <DropdownMenuItem 
-                          className="flex items-center gap-2.5 px-2.5 py-2 text-sm font-semibold text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100/80 rounded-lg cursor-pointer mb-1"
-                          onSelect={() => setScannerOpen(true)}
-                          onClick={() => setScannerOpen(true)}
-                        >
-                          <Ico name="solar:refresh-bold-duotone" className="size-4 text-emerald-600" />
-                          <span>ბიზნეს-სკანერი (საიტი, IG, FB, TikTok)</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="flex items-center gap-2.5 px-2.5 py-2 text-sm text-slate-700 rounded-lg cursor-pointer"
-                          onSelect={() => setInput('გვაქვს ონლაინ მაღაზია, გვიჭირს მომხმარებლების შეკითხვებზე სწრაფი პასუხი და შეკვეთების დამუშავება.')}
-                          onClick={() => setInput('გვაქვს ონლაინ მაღაზია, გვიჭირს მომხმარებლების შეკითხვებზე სწრაფი პასუხი და შეკვეთების დამუშავება.')}
-                        >
-                          <Ico name="solar:paperclip-2-bold-duotone" className="size-4 text-slate-400" />
-                          <span>მაგალითის ჩასმა: ელ-კომერცია</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="flex items-center gap-2.5 px-2.5 py-2 text-sm text-slate-700 rounded-lg cursor-pointer"
-                          onSelect={() => setInput('ჩვენი ვებსაიტია https://example.ge — გვინდა პროცესებისა და მომხმარებლის გზის აუდიტი.')}
-                          onClick={() => setInput('ჩვენი ვებსაიტია https://example.ge — გვინდა პროცესებისა და მომხმარებლის გზის აუდიტი.')}
-                        >
-                          <Ico name="solar:global-bold-duotone" className="size-4 text-slate-400" />
-                          <span>საიტის ბმულის მიბმა</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="flex items-center gap-2.5 px-2.5 py-2 text-sm text-slate-700 rounded-lg cursor-pointer"
-                          onSelect={() => setInput('გვჭირდება სარეკლამო კამპანიებისა და მარკეტინგული ბიუჯეტის ეფექტიანობის შეფასება.')}
-                          onClick={() => setInput('გვჭირდება სარეკლამო კამპანიებისა და მარკეტინგული ბიუჯეტის ეფექტიანობის შეფასება.')}
-                        >
-                          <Ico name="solar:chart-2-bold-duotone" className="size-4 text-slate-400" />
-                          <span>რეკლამისა და მარკეტინგის აუდიტი</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {!isChatMode && <button type="button" className="heroSourceButton" onClick={() => setScannerOpen(true)} aria-label="საიტისა და სოციალური ქსელების დამატება" title="საიტი და სოციალური ქსელები">
+                      <Ico name="solar:add-circle-bold-duotone" className="size-5" />
+                      <span>საიტი / სოციალური ქსელები</span>
+                    </button>}
 
                     <span className="heroIntelligenceLabel">
-                      <Ico name="solar:magic-stick-3-bold-duotone" className="size-3.5 text-emerald-600" />
-                      aiAUDIT Intelligence
+                      <Ico name="solar:magic-stick-3-bold-duotone" className="size-3.5 text-indigo-600" />
+                      aiAUDIT <span className="heroIntelligenceSuffix">Intelligence</span>
                     </span>
                   </div>
 
@@ -491,11 +446,14 @@ export function HeroAiChat() {
                       className={`heroRoundBtn ${thinking ? 'activeThinking' : ''}`}
                       title={thinking ? "ღრმა აზროვნება ჩართულია" : "ღრმა აზროვნება"}
                       onClick={() => setThinking(!thinking)}
+                      aria-label="ღრმა აზროვნება"
+                      aria-pressed={thinking}
+                      disabled={isIntakeLoading}
                     >
                       <Ico name="solar:lightbulb-bolt-bold-duotone" className={`size-4 ${thinking ? 'text-amber-600' : 'text-slate-600'}`} />
                     </button>
 
-                    <VoiceIntakeButton onTranscript={(txt) => setInput((prev) => (prev ? prev + ' ' + txt : txt))} />
+                    <VoiceIntakeButton disabled={isIntakeLoading} language={intakeState?.language || 'ka'} onStatus={setVoiceStatus} onTranscript={(txt) => setInput((prev) => (prev ? prev + ' ' + txt : txt).slice(0, 3000))} />
 
                     {isIntakeLoading ? (
                       <button
@@ -520,6 +478,7 @@ export function HeroAiChat() {
                     )}
                   </div>
                 </div>
+                <p className="heroVoiceStatus" role="status">{voiceStatus || (thinking ? 'ჩართულია უფრო ღრმა შემოწმება. პასუხს შეიძლება მეტი დრო დასჭირდეს.' : '')}</p>
               </div>
             </BorderBeam>
 
@@ -539,7 +498,7 @@ export function HeroAiChat() {
                   className="heroChip"
                   onClick={() => launchPrompt('გვინდა მარკეტინგის, რეკლამისა და კონტენტის ეფექტიანობის შეფასება.')}
                 >
-                  <Target size={13} className="text-emerald-500" />
+                  <Target size={13} className="text-indigo-500" />
                   <span>მარკეტინგისა და რეკლამის აუდიტი</span>
                 </button>
                 <button 
@@ -581,8 +540,22 @@ export function HeroAiChat() {
       <ChannelScannerModal
         isOpen={scannerOpen}
         onClose={() => setScannerOpen(false)}
-        onApplyDiagnosis={launchPrompt}
+        onApplyScan={(payload) => {
+          setIntakeState(payload.intakeState);
+          setConversation([{ id: `scan-${Date.now()}`, role: 'assistant', content: payload.content, suggestions: payload.suggestions }]);
+          setIsChatMode(true);
+        }}
       />
+      {intakeState?.publicScan && <details className="heroSourceSummary">
+        <summary>საჯარო წყაროები · {intakeState.publicScan.sources.filter((source) => source.status === 'read').length} წაკითხული გვერდი</summary>
+        <p>საჯარო ტექსტი — არა თქვენი პასუხით დადასტურებული ფაქტები.</p>
+        {intakeState.publicScan.sources.map((source) => <div key={source.id}>
+          <a href={source.url} target="_blank" rel="noopener noreferrer">[{source.id}] {source.url}</a>
+          <span> · {source.status === 'read' ? 'წაკითხულია' : 'მიუწვდომელია'} · {new Date(source.checkedAt).toLocaleDateString('ka-GE')}</span>
+          {source.provider === 'apify' && <details><summary>წყაროს ტექსტი · Apify</summary><p>{source.excerpt}</p><p>ორიგინალთან დამოუკიდებლად არ არის გადამოწმებული. Run: {source.runId}</p></details>}
+        </div>)}
+        {intakeState.publicScan.observations.map((item, i) => <blockquote key={i}>„{item.quote}“ [{item.sourceId}]</blockquote>)}
+      </details>}
       {intakeState && !intakeState.complete && intakeState.turn >= 5 ? (
         <div className="heroQuickChips">
           <button type="button" className="heroChip" disabled={isIntakeLoading} onClick={() => void sendIntakeMessage('მაჩვენეთ დასკვნა არსებული ინფორმაციით.', 'finish')}>

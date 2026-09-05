@@ -17,6 +17,12 @@
 /.next/
 /.next-audit-check/
 /.next-audit-build/
+/.next-audit-sources/
+/.next-source-build/
+/artifacts/audit-sources/
+/artifacts/social-evidence/
+/.next-audit-release/
+/.next-audit-final/
 /artifacts/audit-check/
 /out/
 

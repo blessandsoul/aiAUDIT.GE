@@ -1,15 +1,15 @@
 /* Per-site brand tokens for aiAUDIT.ge */
 
 :root {
-  --primary: #059669;
+  --primary: #4f46e5;
   --primary-foreground: #ffffff;
-  --accent: #10b981;
+  --accent: #6366f1;
   --accent-foreground: #ffffff;
-  --ring: #059669;
-  --brand: #059669;
-  --brand-soft: #a7f3d0;
-  --brand-cta: #059669;
-  --accent-cta: #047857;
-  --brand-ink: #065f46;
-  --brand-display: #059669;
+  --ring: #4f46e5;
+  --brand: #4f46e5;
+  --brand-soft: #c7d2fe;
+  --brand-cta: #4f46e5;
+  --accent-cta: #4338ca;
+  --brand-ink: #3730a3;
+  --brand-display: #4f46e5;
 }

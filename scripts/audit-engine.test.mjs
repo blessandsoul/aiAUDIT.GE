@@ -121,11 +121,23 @@ test('office, bespoke app, repair and live specialist have distinct recommendati
 test('autonomous fleet is understood but never sold through Quick Audit',()=>{
   const s=prepared('fleet');fact(s,'fleet_task','yes');assert.equal(assess(s).verdict,'not_available');assert.equal(assess(s).product,null);
 });
+test('explicit unavailable fleet request stays unavailable without invented pain',()=>{
+  const s=advanceAudit(createIntakeState('ka'),'ავტონომიური ფლოტის პროექტი გვაინტერესებს',empty);
+  assert.equal(s.focus,'fleet'); assert.equal(assess(s).verdict,'not_available');
+  assert.equal(assess(s).product,null); assert.equal(s.facts.pain,undefined);
+});
 test('weather at impact is neither evidence nor progress',()=>{
   const s=prepared('chats');delete s.facts.impact;s.currentQuestion='impact';s.asked.impact=1;
   const next=advanceAudit(s,'А какая завтра погода в Тбилиси?',empty);
   assert.equal(next.facts.impact,undefined);assert.equal(next.currentQuestion,'impact');assert.equal(next.asked.impact,1);
   assert(!buildFinalBrief(next,'ru').includes('погода'));
+});
+test('repeating the same non-answer twice leaves a gap instead of a question loop',()=>{
+  const s=prepared('chats');delete s.facts.impact;s.currentQuestion='impact';s.asked.impact=1;
+  const first=advanceAudit(s,'I cannot add anything to that.',empty);
+  assert.equal(first.currentQuestion,'impact');
+  const second=advanceAudit(first,'I cannot add anything to that.',empty);
+  assert.equal(second.facts.impact,undefined);assert.notEqual(second.currentQuestion,'impact');
 });
 test('natural uncertainty stays unknown and never enters report evidence',()=>{
   const s=prepared('growth');delete s.facts.loss_reason;s.currentQuestion='loss_reason';

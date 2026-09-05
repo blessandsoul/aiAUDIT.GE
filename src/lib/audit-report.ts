@@ -126,5 +126,12 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
     t('მტკიცებულება — თქვენი სიტყვები', 'Основания — ваши слова', 'Evidence — your words'), evidence(a.evidence.filter((f) => !['business', 'objective', 'priority_check', 'pain', 'impact', 'baseline', ...(a.product ? ['constraints', 'owner'] : [])].includes(f))),
     t('შეგიძლიათ შეასწოროთ ნებისმიერი ფაქტი — ანგარიში თავიდან შეფასდება.', 'Любой факт можно исправить — вывод будет пересмотрен.', 'You can correct any fact — the conclusion will be reassessed.'),
   ];
+  if (s.publicScan) {
+    sections.push(t('საჯარო წყაროები — ცალკე კონტექსტი', 'Публичные источники — отдельный контекст', 'Public sources — separate context'),
+      t('ეს ციტატები არ არის კლიენტის პასუხები და არ ზრდის პროდუქტის შეფასებას.', 'Эти цитаты не являются ответами клиента и не повышают оценку продукта.', 'These quotes are not client answers and do not increase product fit.'),
+      ...s.publicScan.sources.map((source) => `[${source.id}] ${source.url} · ${source.checkedAt} · ${source.status === 'read' ? t('წაკითხულია', 'прочитано', 'read') : t('მიუწვდომელია', 'недоступно', 'unavailable')}`),
+      ...s.publicScan.observations.map((item) => `[${item.sourceId}] “${item.quote}”`),
+      ...s.publicScan.sources.filter((source) => source.provider === 'apify').map((source) => `[${source.id}] Apify ${source.recordType}; run ${source.runId}; ${t('ორიგინალთან დამოუკიდებლად არ არის გადამოწმებული', 'Не сверено независимо с оригиналом', 'Not independently checked against original')}. ${source.excerpt}`));
+  }
   return sections.filter(Boolean).join('\n\n');
 }

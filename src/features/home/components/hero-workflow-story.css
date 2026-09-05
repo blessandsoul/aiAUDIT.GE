@@ -131,9 +131,9 @@
 }
 
 .hero-workflow__row[data-complete='true'] .hero-workflow__icon {
-  border-color: #a7f3d0;
-  background: #ecfdf5;
-  color: #047857;
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
 }
 
 .hero-workflow__row-copy {

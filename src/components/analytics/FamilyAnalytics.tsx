@@ -127,7 +127,7 @@ export function FamilyAnalytics({
 
   return (
     <aside
-      className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 w-[min(16rem,calc(100vw-11.5rem))] md:w-[min(30rem,calc(100vw-26.5rem))]"
+      className="relative m-3 w-auto max-w-lg md:fixed md:bottom-3 md:left-3 md:m-0 md:w-96"
       style={{ zIndex: ANALYTICS_CONSENT_Z_INDEX }}
       aria-labelledby="analytics-consent-title"
       aria-describedby="analytics-consent-description"
@@ -147,7 +147,7 @@ export function FamilyAnalytics({
             {text.text}
           </p>
         </div>
-      <div className="mt-3 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             type="button"
             aria-label={text.reject}

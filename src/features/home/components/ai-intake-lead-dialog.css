@@ -6,7 +6,8 @@
 .aiIntakeLeadDialog {
   width: min(440px, calc(100vw - 32px));
   gap: 0;
-  overflow: hidden;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   border: 0;
   border-radius: 20px;
   background: var(--background);
