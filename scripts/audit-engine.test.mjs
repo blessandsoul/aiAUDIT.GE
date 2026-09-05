@@ -80,10 +80,10 @@ test('partial enum value is not retained as an apparent answer',()=>{
   const s=advanceAudit(createIntakeState(),'Excel',{...empty,updates:[{field:'attribution',value:'none',status:'partial',evidence:'Excel',correction:false}]});
   assert.equal(s.facts.attribution.value,'');assert.equal(s.facts.attribution.status,'partial');
 });
-test('a direct answer to an open server question is retained verbatim when the extractor is partial',()=>{
+test('partial business answers stay partial instead of bypassing semantic validation',()=>{
   const s=createIntakeState();s.currentQuestion='business';
   const next=advanceAudit(s,'დისტრიბუციის კომპანია ვართ.',{...empty,updates:[{field:'business',value:'',status:'partial',evidence:'დისტრიბუციის კომპანია ვართ.',correction:false}]});
-  assert.equal(next.facts.business.status,'confirmed');assert.equal(next.facts.business.quote,'დისტრიბუციის კომპანია ვართ.');
+  assert.equal(next.facts.business.status,'partial');assert.equal(next.facts.business.quote,'დისტრიბუციის კომპანია ვართ.');
 });
 test('paid advertising without purchase measurement cannot receive an AI pilot',()=>{
   const s=prepared('ads');fact(s,'tracking','none');assert.equal(assess(s).verdict,'measurement_first');assert.equal(assess(s).product,null);
@@ -100,7 +100,7 @@ test('catalog routing recognizes every audited product domain without treating r
   };
   for (const [focus, message] of Object.entries(examples)) {
     assert.equal(focusHint(message), focus);
-    const s=advanceAudit(createIntakeState(),message,empty);assert.equal(s.focus,focus);assert.deepEqual(s.facts,{});
+    const s=advanceAudit(createIntakeState(),message,{...empty,focus,focusEvidence:message});assert.equal(s.focus,focus);assert.deepEqual(s.facts,{});
   }
 });
 test('an explicit first-turn process route beats a generic model operations route',()=>{
@@ -120,4 +120,34 @@ test('office, bespoke app, repair and live specialist have distinct recommendati
 });
 test('autonomous fleet is understood but never sold through Quick Audit',()=>{
   const s=prepared('fleet');fact(s,'fleet_task','yes');assert.equal(assess(s).verdict,'not_available');assert.equal(assess(s).product,null);
+});
+test('weather at impact is neither evidence nor progress',()=>{
+  const s=prepared('chats');delete s.facts.impact;s.currentQuestion='impact';s.asked.impact=1;
+  const next=advanceAudit(s,'А какая завтра погода в Тбилиси?',empty);
+  assert.equal(next.facts.impact,undefined);assert.equal(next.currentQuestion,'impact');assert.equal(next.asked.impact,1);
+  assert(!buildFinalBrief(next,'ru').includes('погода'));
+});
+test('natural uncertainty stays unknown and never enters report evidence',()=>{
+  const s=prepared('growth');delete s.facts.loss_reason;s.currentQuestion='loss_reason';
+  const next=advanceAudit(s,'Не знаю, мы их не спрашивали.',empty);
+  assert.equal(next.facts.loss_reason.status,'unknown');assert(!buildFinalBrief(next,'ru').includes('мы их не спрашивали'));
+});
+test('growth word in Georgian does not create calls and generic mentions remain discovery',()=>{
+  const message='Instagram-იდან დღეში 5-10 ადამიანი მწერს. მინდა გაყიდვები გავზარდო.';
+  assert.notEqual(focusHint(message),'calls');
+  const next=advanceAudit(createIntakeState(),message,{...empty,focus:'growth',focusEvidence:message});assert.equal(next.focus,'growth');
+  assert.equal(advanceAudit(createIntakeState(),'Есть продажи, документы и отчёты, не знаем где проблема.',empty).focus,'discovery');
+});
+test('explicit correction changes process and drops old workload and readiness',()=>{
+  const s=prepared('calls');s.currentQuestion='call_permission';
+  const msg='ზარები არ გვაქვს. მთავარი პრობლემა დაბალი ნახვებია.';
+  const next=advanceAudit(s,msg,{...empty,focus:'growth',focusEvidence:'მთავარი პრობლემა დაბალი ნახვებია',updates:[{field:'bottleneck',value:'reach',status:'confirmed',evidence:'დაბალი ნახვებია',correction:false}]});
+  assert.equal(next.focus,'growth');assert.equal(next.facts.scale,undefined);assert.equal(next.facts.owner,undefined);assert(next.facts.business);assert.equal(assess(next).product,null);
+  assert(!buildFinalBrief(next,'ru').includes('подтверждением записи'));
+});
+test('pilot uses client baseline and human boundary before evidence appendix',()=>{
+  const s=prepared('chats');fact(s,'response','delays');fact(s,'baseline','90 evening enquiries, 11 hours');fact(s,'constraints','review');
+  s.facts.baseline.quote='Вечером 90 обращений, ответ через 11 часов';s.facts.constraints.quote='Лечение — только врач';
+  const report=buildFinalBrief(s,'ru');assert(report.includes('С чем сравнивать результат: [baseline:1]'));assert(report.includes('Лечение — только врач'));
+  assert(!report.includes('до старта измерьте исходный результат'));assert(report.indexOf('С чем сравнивать')<report.indexOf('Основания — ваши слова'));
 });

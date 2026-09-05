@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const [name, message] = process.argv.slice(2);
+const dir = path.join(process.env.TEMP, 'aiaudit-review-20260905');
+fs.mkdirSync(dir, {recursive:true});
+const file = path.join(dir, name+'.json');
+const log = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file,'utf8')) : [];
+const response = await fetch((process.env.AUDIT_TEST_URL || 'https://aiaudit.ge')+'/api/ai-intake', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:message}],intakeState:log.at(-1)?.response.intakeState}),signal:AbortSignal.timeout(60000)});
+const body = await response.json();
+if (!response.ok) throw new Error(JSON.stringify({status:response.status,body}));
+log.push({message,response:body});fs.writeFileSync(file,JSON.stringify(log,null,2));
+console.log(JSON.stringify({case:name,turn:log.length,content:body.content,suggestions:body.suggestions,assessment:body.assessment,focus:body.intakeState.focus,field:body.intakeState.currentQuestion},null,2));

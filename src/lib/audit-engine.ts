@@ -40,6 +40,7 @@ export function requiredFields(s: IntakeState): Field[] {
   const core: Field[] = ['business', 'objective', 'pain', ...branch, 'process', 'scale', 'impact', 'severity'];
   if (s.focus === 'discovery') core.splice(2, 0, 'area');
   if (['none', 'minor'].includes(val(s, 'severity'))) return [...new Set<Field>([...core, 'priority_check'])];
+  if (['growth', 'attribution'].includes(s.focus)) return [...new Set<Field>([...core, 'systems', 'baseline', 'priority_check'])];
   // A human service, bespoke discovery, existing-app assessment and an unavailable
   // fleet direction do not need to masquerade as a ready-to-run AI automation.
   if (s.focus === 'staff') return [...new Set<Field>([...core, 'owner', 'priority_check'])];
@@ -56,10 +57,20 @@ export function questionFor(s: IntakeState): { field: Field; content: string; su
   } else if ((s.asked[field] ?? 0) > 1) {
     content += ' ' + l('შეგიძლიათ დაწეროთ შეფასება ან აირჩიოთ „არ ვიცი“.', 'Можно дать оценку или выбрать «Не знаю».', 'An estimate is fine, or choose “I don’t know”.')[s.language];
   }
+  const anchorField: Partial<Record<Field, Field>> = { impact: 'pain', data: 'systems', alternative: 'pain', constraints: 'process' };
+  const anchor = s.facts[anchorField[field] as Field];
+  if ((s.asked[field] ?? 0) === 1 && anchor && known(anchor) && anchor.quote.length <= 180) {
+    content = l(`თქვენ თქვით: „${anchor.quote}“. `, `Вы сказали: «${anchor.quote}». `, `You said: “${anchor.quote}”. `)[s.language] + content;
+  }
   return { field, content, suggestions: [...question.options.map((o) => o.label[s.language]), UNKNOWN[s.language], DECLINED[s.language]] };
 }
 export function isControlAnswer(message: string): boolean {
   return /^(?:გასაგებია[,!]?\s*(?:მადლობა)?|მადლობა|დამატებითი დეტალები მაქვს|понятно|спасибо|есть дополнительные детали|thanks|thank you|okay|ok)[.!\s]*$/iu.test(message.trim());
+}
+export function uncertaintyAnswer(message: string): 'unknown' | 'declined' | null {
+  if (/^(?:не знаю|не могу сказать|не измеряли|не считаем|არ ვიცი|არ ვითვლი|არ ვზომავთ|i don.?t know|we don.?t know|not measured)(?:[.!?,\s].*)?$/iu.test(message.trim())) return 'unknown';
+  if (/^(?:не хочу отвечать|не хочу сообщать|არ მინდა პასუხ|არ მსურს პასუხ|prefer not to|i decline)/iu.test(message.trim())) return 'declined';
+  return null;
 }
 // Routing hint only, never a confirmed fact or recommendation. An explicit
 // influencer-measurement question must not get lost in generic growth intake.
@@ -82,7 +93,7 @@ export function focusHint(message: string): Focus | null {
   if (/დოკუმენტ|документ|invoice|ინვოის|накладн/u.test(text)) return 'docs';
   if (/საიტ|website|web.?site|лендинг/u.test(text)) return 'web';
   if (/შეკვეთ.{0,80}(?:excel|таблиц|სისტემ)|approval|დამტკიც|ручн.{0,15}(?:перенос|ввод)|ხელით.{0,50}(?:გადატან|შეყვან)/u.test(text)) return 'office';
-  if (/ზარ|ურეკ|телефон|звон|call|booking|ჩაწერ/u.test(text)) return 'calls';
+  if (/(?<!\p{L})(?:ზარ(?:ი|ები|ებით|ების|ებს|ზე)|ვურეკავთ|ურეკავს|телефон\p{L}*|звон\p{L}*|calls?)(?!\p{L})/u.test(text)) return 'calls';
   if (/instagram|whatsapp|messenger|ვწერთ|შეტყობინ|сообщен|chat/u.test(text)) return 'chats';
   return null;
 }
@@ -91,6 +102,8 @@ export function exactChoice(s: IntakeState, message: string): Update | null {
   const field = s.currentQuestion, text = message.trim();
   if (Object.values(UNKNOWN).includes(text)) return { field, value: '', status: 'unknown', evidence: text, correction: false };
   if (Object.values(DECLINED).includes(text)) return { field, value: '', status: 'declined', evidence: text, correction: false };
+  const uncertain = uncertaintyAnswer(text);
+  if (uncertain && text.split(/[.!?]\s+/u).length === 1 && !/\b(?:но|but)\b|მაგრამ/u.test(text)) return { field, value: '', status: uncertain, evidence: text, correction: false };
   const option = BANK[field].options.find((o) => Object.values(o.label).includes(text));
   return option ? { field, value: option.value, status: 'confirmed', evidence: text, correction: s.facts[field]?.status === 'contradicted' } : null;
 }
@@ -101,18 +114,10 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   s.history.push({ role: 'user', content: message });
   const control = isControlAnswer(message), direct = exactChoice(previous, message);
   const modelUpdates = control ? [] : extraction.updates.filter((u) => u.field !== direct?.field);
-  // For an open, server-selected question, the customer's answer is already
-  // evidence for that field. Keep it verbatim if the extractor only marks it
-  // partial or misses it; never use this fallback for enum-based facts.
-  const current = previous.currentQuestion;
-  const openAnswer = current && BANK[current].options.length === 0 && !control && !direct && message.trim().length >= 6;
-  const modelConfirmedCurrent = current && modelUpdates.some((u) => u.field === current && ['confirmed', 'estimated'].includes(u.status));
-  const fallback = openAnswer && !modelConfirmedCurrent
-    ? [{ field: current, value: message.trim(), status: 'confirmed' as FactStatus, evidence: message.trim(), correction: false }]
-    : [];
-  const updates = [...modelUpdates, ...(direct ? [direct] : []), ...fallback];
+  const updates = [...modelUpdates, ...(direct ? [direct] : [])];
   for (const u of updates) {
     if (!FIELDS.includes(u.field) || !u.evidence.trim() || !message.includes(u.evidence) || u.evidence.length > 600 || u.value.length > 400) continue;
+    if (['confirmed', 'estimated'].includes(u.status) && uncertaintyAnswer(u.evidence)) continue;
     const options = BANK[u.field].options;
     if (['confirmed', 'estimated'].includes(u.status) && options.length && !options.some((o) => o.value === u.value)) continue;
     if (['unknown', 'declined', 'not_applicable'].includes(u.status) && u.field !== previous.currentQuestion) continue;
@@ -126,11 +131,12 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     };
   }
   const selectedArea = s.facts.area;
-  if (selectedArea && known(selectedArea) && FOCUSES.includes(selectedArea.value as Focus) && (s.focus === 'discovery' || selectedArea.turn === s.turn)) {
+  if (selectedArea && known(selectedArea) && FOCUSES.includes(selectedArea.value as Focus) && (s.focus === 'discovery' || previous.currentQuestion === 'area')) {
     s.focus = selectedArea.value as Focus; s.focusQuote = selectedArea.quote;
   }
   if (!control && extraction.focus !== 'discovery' && FOCUSES.includes(extraction.focus) && extraction.focusEvidence.length > 2 && message.includes(extraction.focusEvidence)
-    && (s.focus === 'discovery' || s.focus === 'growth' || !known(previous.facts.pain) || val(s, 'priority_check') === 'another')) {
+    && (s.focus === 'discovery' || !known(previous.facts.pain) || val(s, 'priority_check') === 'another'
+      || /не .{0,40}(?:проблем|звон|документ)|вообще нет|не звоним|исправ|главная проблема|მთავარი პრობლემა|არ გვაქვს|არავის ვურეკავთ|გთხოვ|not .{0,30}problem|we don.t call|actually|instead/iu.test(message))) {
     s.focus = extraction.focus; s.focusQuote = extraction.focusEvidence;
     if (val(s, 'priority_check') === 'another') delete s.facts.priority_check;
   }
@@ -140,11 +146,23 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   const hintedFocus = focusHint(message);
   // A direct first-turn product/process signal must beat a generic model route
   // such as "operations". It must not overwrite a later, specific diagnosis.
-  const canApplyHint = s.focus === 'discovery'
-    || (s.focus === 'growth' && extraction.focus === 'discovery')
-    || (s.turn === 1 && ['growth', 'operations'].includes(s.focus));
+  const canApplyHint = s.turn === 1 && s.focus === 'operations' && hintedFocus === 'office';
   if (!control && hintedFocus && canApplyHint) {
     s.focus = hintedFocus; s.focusQuote = message.slice(0, 600);
+  }
+  // A switch of investigated process invalidates old process-specific evidence.
+  // Current-message evidence can establish the new process; business context stays.
+  if (previous.focus !== 'discovery' && s.focus !== previous.focus) {
+    const context: Field[] = ['business', 'objective', 'channels', 'area'];
+    for (const field of FIELDS) if (!context.includes(field)) {
+      if (s.facts[field]?.turn !== s.turn || s.facts[field]?.status === 'contradicted') delete s.facts[field];
+      delete s.asked[field];
+    }
+  }
+  // An unrelated answer must not consume a question attempt or advance the interview.
+  if (!finish && s.turn < MAX_AUDIT_TURNS && previous.currentQuestion && s.focus === previous.focus && !updates.length && !control) {
+    s.currentQuestion = previous.currentQuestion;
+    return s;
   }
   const required = requiredFields(s);
   const exhausted = finish || s.turn >= MAX_AUDIT_TURNS;
