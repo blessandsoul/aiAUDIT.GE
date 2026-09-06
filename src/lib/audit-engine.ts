@@ -58,6 +58,7 @@ function requiredBase(s: IntakeState): Field[] {
   if (s.focus === 'ads' && ['none', 'clicks'].includes(val(s, 'tracking'))) return ['business', 'objective', 'acquisition', 'tracking', 'systems', 'owner', 'priority_check'];
   let branch = [...BRANCH_FIELDS[s.focus]];
   if (s.focus === 'growth') {
+    if (val(s, 'bottleneck') === 'conversion') branch = ['bottleneck', 'lost_case', 'loss_stage', 'loss_reason', 'follow_up', 'acquisition', 'conversion'];
     if (['reach', 'enquiries'].includes(val(s, 'bottleneck'))) branch = ['bottleneck', 'acquisition', 'conversion'];
     if (val(s, 'bottleneck') === 'fulfilment') branch = ['bottleneck', 'process', 'repetition'];
   }
@@ -65,7 +66,8 @@ function requiredBase(s: IntakeState): Field[] {
   const core: Field[] = ['business', 'objective', 'pain', ...branch, 'process', 'scale', 'impact', 'severity'];
   if (s.focus === 'discovery') core.splice(2, 0, 'area');
   if (['none', 'minor'].includes(val(s, 'severity'))) return [...new Set<Field>([...core, 'priority_check'])];
-  if (['growth', 'attribution'].includes(s.focus)) return [...new Set<Field>([...core, 'systems', 'baseline', 'priority_check'])];
+  if (s.focus === 'growth') return [...new Set<Field>([...core, 'customer', 'systems', 'priority_check'])];
+  if (s.focus === 'attribution') return [...new Set<Field>([...core, 'systems', 'baseline', 'priority_check'])];
   // A human service, bespoke discovery, existing-app assessment and an unavailable
   // fleet direction do not need to masquerade as a ready-to-run AI automation.
   if (s.focus === 'staff') return [...new Set<Field>([...core, 'owner', 'priority_check'])];
@@ -77,6 +79,8 @@ export function questionFor(s: IntakeState): { field: Field; content: string; su
   if (s.complete || !s.currentQuestion) return null;
   const field = s.currentQuestion, fact = s.facts[field], question = BANK[field];
   let content = question.text[s.language];
+  const renovation = /სარემონტო|რემონტ|ремонт|renovat/iu.test(val(s, 'business'));
+  if (field === 'loss_stage' && renovation) content = l('ბოლო მომხმარებელი რომელ ეტაპზე შეჩერდა — პირველი ფასის, ადგილზე დათვალიერების თუ დეტალური ხარჯთაღრიცხვის შემდეგ?', 'Последний клиент остановился после первой цены, осмотра объекта или подробной сметы?', 'Did the last customer stop after the initial price, the site visit, or the detailed estimate?')[s.language];
   if (fact?.previous && fact.status === 'partial') {
     content = l(`ადრე თქვით: „${fact.previous.quote}“, ახლა კი: „${fact.quote}“. ეს შესწორებაა თუ სხვადასხვა პერიოდს ან პროცესს გულისხმობთ?`, `Ранее: «${fact.previous.quote}». Сейчас: «${fact.quote}». Это исправление или речь о разных периодах либо процессах?`, `Earlier: “${fact.previous.quote}”. Now: “${fact.quote}”. Is this a correction, or do these describe different periods or processes?`)[s.language];
   } else if (fact?.status === 'contradicted' && fact.previous) {
@@ -84,7 +88,7 @@ export function questionFor(s: IntakeState): { field: Field; content: string; su
   } else if ((s.asked[field] ?? 0) > 1) {
     content += ' ' + l('შეგიძლიათ დაწეროთ შეფასება ან აირჩიოთ „არ ვიცი“.', 'Можно дать оценку или выбрать «Не знаю».', 'An estimate is fine, or choose “I don’t know”.')[s.language];
   }
-  const anchorField: Partial<Record<Field, Field>> = { impact: 'pain', data: 'systems', alternative: 'pain', constraints: 'process' };
+  const anchorField: Partial<Record<Field, Field>> = { impact: 'pain', data: 'systems', alternative: 'pain', constraints: 'process', lost_case: 'bottleneck', loss_stage: 'lost_case', follow_up: 'loss_reason' };
   const anchor = s.facts[anchorField[field] as Field];
   if ((s.asked[field] ?? 0) === 1 && anchor && known(anchor) && anchor.quote.length <= 180) {
     content = l(`თქვენ თქვით: „${anchor.quote}“. `, `Вы сказали: «${anchor.quote}». `, `You said: “${anchor.quote}”. `)[s.language] + content;
@@ -152,6 +156,7 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     const pending = old && (old.status === 'contradicted' || (old.status === 'partial' && old.previous));
     const resolving = pending && previous.currentQuestion === u.field;
     const correction = resolving || (u.correction && /შესწორ|შეცდომ|არა[, ]|სინამდვილ|исправ|ошиб|не .+ а |на самом|correction|actually|meant|instead/iu.test(message));
+    if (u.field === 'business' && old && known(old) && !correction && /^(?:სერვის(?:ი|ს)?|მომსახურება|услуг[аиу]?|сервис|services?|shop|магазин)[.!\s]*$/iu.test(u.value.trim())) continue;
     const conflict = old && known(old) && options.length > 0 && ['confirmed', 'estimated'].includes(u.status) && old.value !== u.value && !correction;
     const quantityReview = old && known(old) && ['confirmed', 'estimated'].includes(u.status) && changedQuantity(old, u) && !correction;
     if (pending && !correction && ['confirmed', 'estimated'].includes(u.status)) continue;
@@ -166,7 +171,7 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     s.focus = selectedArea.value as Focus; s.focusQuote = selectedArea.quote;
   }
   if (!control && extraction.focus !== 'discovery' && FOCUSES.includes(extraction.focus) && extraction.focusEvidence.length > 2 && message.includes(extraction.focusEvidence)
-    && (s.focus === 'discovery' || !known(previous.facts.pain) || val(s, 'priority_check') === 'another'
+    && (s.focus === 'discovery' || (!known(previous.facts.pain) && !known(previous.facts.bottleneck)) || val(s, 'priority_check') === 'another'
       || /не .{0,40}(?:проблем|звон|документ)|вообще нет|не звоним|исправ|главная проблема|მთავარი პრობლემა|არ გვაქვს|არავის ვურეკავთ|გთხოვ|not .{0,30}problem|we don.t call|actually|instead/iu.test(message))) {
     s.focus = extraction.focus; s.focusQuote = extraction.focusEvidence;
     if (val(s, 'priority_check') === 'another') delete s.facts.priority_check;
@@ -186,7 +191,7 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   // Current-message evidence can establish the new process; business context stays.
   const revisitingProcess = previous.currentQuestion === 'area' && val(previous, 'priority_check') === 'another' && known(s.facts.area);
   if ((previous.focus !== 'discovery' && s.focus !== previous.focus) || revisitingProcess) {
-    const context: Field[] = ['business', 'objective', 'channels', 'area'];
+    const context: Field[] = ['business', 'customer', 'objective', 'channels', 'area'];
     for (const field of FIELDS) if (!context.includes(field)) {
       if (s.facts[field]?.turn !== s.turn || s.facts[field]?.status === 'contradicted') delete s.facts[field];
       delete s.asked[field];
@@ -213,7 +218,9 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   }
   const missing = required.filter((f) => !considered(f));
   const conflict = missing.find((f) => s.facts[f]?.status === 'contradicted' || s.facts[f]?.previous);
-  const essential = missing.find((f) => BRANCH_FIELDS[s.focus].includes(f));
+  const diagnosticOrder: Field[] = s.focus === 'growth' && val(s, 'bottleneck') === 'conversion'
+    ? ['lost_case', 'loss_stage', 'loss_reason', 'follow_up', 'acquisition', 'conversion'] : BRANCH_FIELDS[s.focus];
+  const essential = diagnosticOrder.find((f) => missing.includes(f));
   const basics = missing.find((f) => ['business', 'objective'].includes(f));
   let target: Field = basics ?? conflict ?? essential ?? missing[0] ?? 'area';
   if (!basics && !conflict && !essential && extraction.nextField && missing.slice(0, 3).includes(extraction.nextField)) target = extraction.nextField;

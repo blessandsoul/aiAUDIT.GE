@@ -13,7 +13,8 @@ export const DECLINED = l('გამოტოვება', 'Пропустит�
 // One semantic question owns both its wording and its answer choices. Free text
 // remains available; quantities, deadlines and job titles are never prefilled.
 export const BANK = {
-  business: q('What exactly the business sells and to whom. A bare "shop" is partial.', 'რას ყიდის თქვენი კომპანია და ვინ არის მთავარი მომხმარებელი?', 'Что продаёт ваша компания и кто основной покупатель?', 'What does your company sell, and who is the main customer?'),
+  business: q('Specific product or service sold. Renovation services alone is confirmed; customer identity is a SEPARATE field. Bare shop, company or service with no kind is partial. Do not replace a specific known business with a generic restatement.', 'კონკრეტულად რას სთავაზობს თქვენი კომპანია მომხმარებელს?', 'Что конкретно предлагает ваша компания?', 'What specifically does your company offer?'),
+  customer: q('Actual customer type. Never infer homeowners from renovation services, or patients from a channel. Unknown if not stated.', 'ვინ არის თქვენი ძირითადი მომხმარებელი?', 'Кто ваш основной покупатель?', 'Who is your main customer?'),
   objective: q('Desired outcome, not a proven result.', 'რომელი შედეგის გაუმჯობესებაა ახლა თქვენთვის ყველაზე მნიშვნელოვანი?', 'Какой результат сейчас важнее всего улучшить?', 'Which result matters most to improve right now?'),
   area: q('The process the user wants examined first; choose only from their evidence.', 'რომელ პროცესში ხედავთ ყველაზე დიდ სირთულეს?', 'В каком процессе вы видите главную трудность?', 'Which process is causing the most difficulty?', [
     option('growth', 'მომხმარებლის მოზიდვა და გაყიდვები', 'Привлечение клиентов и продажи', 'Acquisition and sales'),
@@ -31,6 +32,15 @@ export const BANK = {
   ]),
   conversion: q('Actual enquiry-to-purchase baseline with period or explicitly unknown; a sales growth target is not this fact.', 'ჩვეულებრივ პერიოდში მიღებული მომართვებიდან დაახლოებით რამდენი სრულდება შეძენით?', 'Сколько обращений за обычный период примерно заканчивается покупкой?', 'Roughly how many enquiries become purchases in a typical period?'),
   loss_reason: q('Customer-reported reason for not purchasing, or explicitly unknown. Never infer price, speed or quality.', 'რა მიზეზს ასახელებს მომხმარებელი, როცა შეძენაზე უარს ამბობს?', 'Какую причину называют покупатели, когда отказываются от покупки?', 'What reason do customers give for not buying?'),
+  lost_case: q('One actual lost enquiry: what the customer wanted and what happened. A generic expensive objection, aggregate conversion or guess is not an actual case. Extract stage/reason/follow_up separately if provided; omit names and contact details.', 'გაიხსენეთ ბოლო მომართვა, რომელიც შეკვეთით არ დასრულდა. რა სურდა მომხმარებელს და რა მოხდა?', 'Вспомните последнее обращение, которое не стало заказом. Что хотел клиент и что произошло?', 'Think of the last enquiry that did not become an order. What did the customer want, and what happened?'),
+  loss_stage: q('Observed stage where a prospective customer stopped. Never infer after_quote from expensive alone. Use only supported enum.', 'რომელ ეტაპზე შეწყდა ეს საუბარი?', 'На каком этапе остановился этот разговор?', 'At which stage did that conversation stop?', [
+    option('before_price', 'ფასის განხილვამდე', 'До обсуждения цены', 'Before discussing price'),
+    option('initial_price', 'პირველი ფასის დასახელების შემდეგ', 'После первой цены', 'After the initial price'),
+    option('meeting', 'შეხვედრის ან ადგილზე დათვალიერების შემდეგ', 'После встречи или осмотра', 'After a meeting or site visit'),
+    option('proposal', 'დეტალური შეთავაზების შემდეგ', 'После подробного предложения', 'After the detailed proposal'),
+    option('decision', 'საბოლოო გადაწყვეტილების ეტაპზე', 'При окончательном решении', 'At the final decision'),
+  ]),
+  follow_up: q('What actually happened after that customer hesitated or stopped responding. A staff member handling incoming leads does not prove follow-up.', 'ამ საუბრის შემდეგ მომხმარებელს ისევ დაუკავშირდით? რა შედეგით?', 'После этого вы повторно связались с клиентом? Чем закончилось?', 'Did you contact that customer again afterwards? What happened?'),
   acquisition: q('Current acquisition mechanism.', 'როგორ იზიდავთ ახალ მომხმარებელს ახლა?', 'Как вы сейчас привлекаете новых покупателей?', 'How do you attract new customers today?', [
     option('organic', 'პოსტებითა და რეკომენდაციებით', 'Публикациями и рекомендациями', 'Posts and referrals'),
     option('paid', 'ფასიანი რეკლამით', 'Платной рекламой', 'Paid advertising'),
