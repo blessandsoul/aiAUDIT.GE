@@ -139,7 +139,9 @@
 
 /* Inline conversation: the original composer stays intact and moves by layout transform. */
 .heroFirstScreen--conversation {
+  --audit-conversation-width: 1080px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   align-items: stretch;
   justify-items: center;
@@ -152,7 +154,8 @@
 
 .heroConversationMotionWrap {
   display: flex;
-  width: min(720px, 100%);
+  width: min(var(--audit-conversation-width), 100%);
+  min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -472,6 +475,8 @@
 .heroConversationSuggestion:disabled { cursor: wait; opacity: .55; }
 
 .heroFirstScreen--conversation .heroAiChatWrap {
+  width: min(var(--audit-conversation-width), 100%);
+  min-width: 0;
   grid-row: 2;
   margin-top: 0;
   align-self: end;
