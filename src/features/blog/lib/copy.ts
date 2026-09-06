@@ -15,6 +15,10 @@ const COPY = {
     sources: 'წყაროები',
     updated: 'განახლდა',
     minRead: 'წაკითხვის დრო',
+    methodTitle: 'როგორ მომზადდა მასალა',
+    methodText: 'კვლევისა და ტექსტის სტრუქტურის მომზადებაში გამოყენებულია AI. გამოქვეყნებამდე წყაროები, ფაქტობრივი მტკიცებები, რეკომენდაციები და პროდუქტის საზღვრები ცალ-ცალკე მოწმდება. მასალაზე სარედაქციო პასუხისმგებლობა aiNOW-ს ეკისრება.',
+    publisher: 'სარედაქციო მიდგომა',
+    corrections: 'თუ შეცდომა შენიშნეთ, მოგვწერეთ',
   },
   en: {
     eyebrow: 'Practical guides by aiNOW',
@@ -30,6 +34,10 @@ const COPY = {
     sources: 'Sources',
     updated: 'Updated',
     minRead: 'Reading time',
+    methodTitle: 'How this guide was prepared',
+    methodText: 'AI was used to assist research and text structuring. Before publication, sources, factual claims, recommendations and product boundaries are checked separately. aiNOW retains editorial responsibility for the material.',
+    publisher: 'Editorial approach',
+    corrections: 'Report an error',
   },
   ru: {
     eyebrow: 'Практические материалы aiNOW',
@@ -45,6 +53,10 @@ const COPY = {
     sources: 'Источники',
     updated: 'Обновлено',
     minRead: 'Время чтения',
+    methodTitle: 'Как подготовлен материал',
+    methodText: 'ИИ использовался для помощи в исследовании и построении структуры текста. Перед публикацией источники, фактические утверждения, рекомендации и границы продукта проверяются отдельно. Редакционную ответственность за материал несёт aiNOW.',
+    publisher: 'Редакционный подход',
+    corrections: 'Сообщить об ошибке',
   },
 } as const;
 

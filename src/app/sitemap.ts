@@ -20,6 +20,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
+  for (const locale of INDEXED_LOCALES) {
+    entries.push({
+      url: localeUrl(locale, '/editorial-policy'),
+      changeFrequency: 'yearly',
+      priority: 0.4,
+      alternates: { languages: buildAlternates('/editorial-policy', locale).languages },
+    });
+  }
+
   if (!isPublicRoute('/blog')) return entries;
 
   for (const slug of getPostSlugs()) {

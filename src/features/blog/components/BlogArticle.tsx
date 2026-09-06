@@ -40,7 +40,7 @@ export function BlogArticle({
         <h1>{post.title}</h1>
         <p className="article-deck">{post.excerpt}</p>
         <div className="article-byline">
-          <span>{post.author.name}</span>
+          <Link href="/editorial-policy" className="article-author">{post.author.name}</Link>
           {post.author.role ? <span>{post.author.role}</span> : null}
           <time dateTime={post.updated}>{copy.updated} {formatDate(post.updated, post.locale)}</time>
           <span>{copy.minRead}: {post.readTime}</span>
@@ -70,6 +70,20 @@ export function BlogArticle({
           </aside>
         ) : null}
       </div>
+
+      <section className="article-method" data-family-shell="true" aria-labelledby="article-method-heading">
+        <div className="article-method-icon" aria-hidden="true">
+          <Ico name="solar:verified-check-bold-duotone" />
+        </div>
+        <div>
+          <h2 id="article-method-heading">{copy.methodTitle}</h2>
+          <p>{copy.methodText}</p>
+          <div className="article-method-links">
+            <Link href="/editorial-policy">{copy.publisher}</Link>
+            <Link href="/contact">{copy.corrections}</Link>
+          </div>
+        </div>
+      </section>
 
       {post.sources.length > 0 ? (
         <section className="article-sources" data-family-shell="true" aria-labelledby="article-sources-heading">
