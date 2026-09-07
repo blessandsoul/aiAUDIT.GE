@@ -5,6 +5,9 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Opt-in local verification on resource-constrained machines; production
+  // behavior is unchanged unless this build-only flag is explicitly set.
+  ...(process.env.AUDIT_LOW_MEMORY_BUILD === "true" ? { experimental: { cpus: 2 } } : {}),
   // Allow a second dev server (the aiads port) to use its own build dir so two
   // `next dev` instances can run on one project without sharing .next locks.
   distDir: process.env.NEXT_DIST_DIR || ".next",

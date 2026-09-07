@@ -153,6 +153,7 @@ export function HeroAiChat() {
   const [isChatMode, setIsChatMode] = useState(false);
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [intakeState, setIntakeState] = useState<IntakeState | null>(null);
+  const [auditMode, setAuditMode] = useState<'quick' | 'deep'>('quick');
   const [isIntakeLoading, setIsIntakeLoading] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
@@ -259,6 +260,7 @@ export function HeroAiChat() {
           // Prior turns already live in the signed state; do not duplicate them.
           messages: [{ role: userMessage.role, content }],
           intakeState,
+          mode: intakeState?.mode || auditMode,
           action,
           thinking,
         }),
@@ -404,6 +406,12 @@ export function HeroAiChat() {
           ) : null}
 
           <div className="heroComposerStack">
+            {!intakeState && <div className="flex flex-wrap items-center gap-2 px-2 pb-2" aria-label="Audit mode">
+              {(['quick', 'deep'] as const).map(mode => <button key={mode} type="button" disabled={isIntakeLoading} aria-pressed={auditMode === mode}
+                onClick={() => setAuditMode(mode)} className={`rounded-full border px-3 py-2 text-sm ${auditMode === mode ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600'}`}>
+                {mode === 'quick' ? 'Quick Audit' : 'Deep · ერთი პროცესი'}
+              </button>)}
+            </div>}
             <BorderBeam
               active
               className="heroComposerBeam"
@@ -538,6 +546,7 @@ export function HeroAiChat() {
         ) : null}
       </div>
       <ChannelScannerModal
+        mode={auditMode}
         isOpen={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onApplyScan={(payload) => {

@@ -1,10 +1,12 @@
 import { BANK, BRANCH_FIELDS, DECLINED, FIELDS, FOCUSES, UNKNOWN, l, type Field, type Focus, type Language } from './audit-bank.ts';
 import { PRODUCT_CATALOG, PRODUCT_FOR_FOCUS, type ProductKey } from './audit-product-catalog.ts';
 import type { PublicScan } from './audit-public-sources.ts';
+import { DEEP_FIELDS } from './audit-deep-bank.ts';
 export type IntakeLanguage = Language;
 export type FactStatus = 'confirmed' | 'estimated' | 'partial' | 'unknown' | 'declined' | 'not_applicable' | 'contradicted';
 export type Fact = { id: string; field: Field; value: string; status: FactStatus; quote: string; turn: number; previous?: { value: string; quote: string } };
 export type IntakeState = {
+  mode?: 'quick' | 'deep';
   version: 2; turn: number; language: Language; focus: Focus; focusQuote: string;
   facts: Partial<Record<Field, Fact>>; asked: Partial<Record<Field, number>>;
   currentQuestion: Field | null; complete: boolean; stopReason: 'enough' | 'limited' | null;
@@ -14,11 +16,12 @@ export type IntakeState = {
 export type Update = { field: Field; value: string; status: FactStatus; evidence: string; correction: boolean };
 export type Extraction = { focus: Focus; focusEvidence: string; updates: Update[]; nextField: Field | null };
 export const MAX_AUDIT_TURNS = 24;
+export const auditTurnLimit = (s: IntakeState) => s.mode === 'deep' ? 40 : MAX_AUDIT_TURNS;
 export const known = (f?: Fact) => Boolean(f && ['confirmed', 'estimated'].includes(f.status));
 const settled = (f?: Fact) => Boolean(f && !['partial', 'contradicted'].includes(f.status));
 export const usable = (s: IntakeState, f: Field) => known(s.facts[f]);
 export const val = (s: IntakeState, f: Field) => usable(s, f) ? s.facts[f]!.value : '';
-const quantitativeFields: Field[] = ['scale', 'impact', 'baseline', 'conversion'];
+const quantitativeFields: Field[] = ['scale', 'impact', 'baseline', 'conversion', 'volume_peaks', 'unit_time', 'error_cost', 'review_capacity'];
 // A changed quantity is a clarification candidate, not automatically a factual
 // contradiction: periods, units or channels may differ. Never silently replace it.
 function changedQuantity(old: Fact, update: Update): boolean {
@@ -35,8 +38,8 @@ function changedQuantity(old: Fact, update: Update): boolean {
   return quantitativeFields.includes(update.field) && Boolean(before)
     && (before !== after || (Boolean(oldUnits) && oldUnits !== newUnits));
 }
-export function createIntakeState(language: Language = 'ka'): IntakeState {
-  return { version: 2, turn: 0, language, focus: 'discovery', focusQuote: '', facts: {}, asked: {}, currentQuestion: null, complete: false, stopReason: null, history: [] };
+export function createIntakeState(language: Language = 'ka', mode: 'quick' | 'deep' = 'quick'): IntakeState {
+  return { version: 2, mode, turn: 0, language, focus: 'discovery', focusQuote: '', facts: {}, asked: {}, currentQuestion: null, complete: false, stopReason: null, history: [] };
 }
 // HTTP callers must verify the signature before accepting state.
 export function parseIntakeState(value: unknown): IntakeState {
@@ -49,8 +52,21 @@ export function languageOf(text: string, previous: Language = 'ka'): Language {
   if (/[a-z]{3}/iu.test(text)) return 'en';
   return previous;
 }
+export function deepFieldsFor(s: IntakeState): Field[] {
+  if (s.mode !== 'deep' || ['discovery', 'fleet'].includes(s.focus) || ['none','minor'].includes(val(s,'severity'))) return [];
+  if ((s.focus === 'ads' && ['none','clicks'].includes(val(s,'tracking'))) || s.focus === 'attribution')
+    return ['process_owner','source_of_truth','data_quality','permissions','pilot_scope','success_threshold','baseline_period','review_capacity'];
+  if (s.focus === 'growth' || (s.focus === 'office' && val(s,'office_task') === 'approvals') || (s.focus === 'docs' && val(s,'docs_task') === 'decision') || val(s,'repetition') === 'unique')
+    return ['process_owner','trigger','completion','exceptions','handoff','unit_time','pilot_scope','success_threshold','stop_rules','baseline_period'];
+  return DEEP_FIELDS;
+}
+// Explicitly inapplicable optional facts close a gap but never authorize a test.
+export const deepResolved = (s: IntakeState, f: Field) => usable(s,f) ||
+  (['handoff','personal_data','volume_peaks','seasonality','dependencies','error_cost'].includes(f)
+    && s.facts[f]?.status === 'not_applicable' && Boolean(s.facts[f]?.quote));
 export function requiredFields(s: IntakeState): Field[] {
-  return [...new Set<Field>([...requiredBase(s), ...(val(s, 'priority_check') === 'another' ? ['area' as Field] : [])])];
+  const deep = deepFieldsFor(s);
+  return [...new Set<Field>([...requiredBase(s).filter(f => f !== 'priority_check'), ...deep, 'priority_check', ...(val(s, 'priority_check') === 'another' ? ['area' as Field] : [])])];
 }
 function requiredBase(s: IntakeState): Field[] {
   if (s.focus === 'discovery' && val(s, 'severity') === 'none') return ['business', 'objective', 'severity', 'priority_check'];
@@ -121,7 +137,7 @@ export function focusHint(message: string): Focus | null {
   if (/ცოცხალ.{0,15}(?:სპეციალისტ|მომსახურ)|live.{0,15}specialist|жив.{0,15}специалист/u.test(text)) return 'staff';
   if (/რეკლამ|реклам|paid ad|campaign|კამპანი/u.test(text)) return 'ads';
   if (/კონტენტ|контент|content.{0,20}(?:create|производ|შექმნ)/u.test(text)) return 'content';
-  if (/დოკუმენტ|документ|invoice|ინვოის|накладн/u.test(text)) return 'docs';
+  if (/დოკუმენტ|документ|\bdocuments?\b|invoice|ინვოის|накладн/u.test(text)) return 'docs';
   if (/საიტ|website|web.?site|лендинг/u.test(text)) return 'web';
   if (/შეკვეთ.{0,80}(?:excel|таблиц|სისტემ)|approval|დამტკიც|ручн.{0,15}(?:перенос|ввод)|ხელით.{0,50}(?:გადატან|შეყვან)/u.test(text)) return 'office';
   if (/(?<!\p{L})(?:ზარ(?:ი|ები|ებით|ების|ებს|ზე)|ვურეკავთ|ურეკავს|телефон\p{L}*|звон\p{L}*|calls?)(?!\p{L})/u.test(text)) return 'calls';
@@ -147,6 +163,7 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   const modelUpdates = control ? [] : extraction.updates.filter((u) => u.field !== direct?.field);
   const updates = [...modelUpdates, ...(direct ? [direct] : [])];
   for (const u of updates) {
+    if (s.mode !== 'deep' && (DEEP_FIELDS as Field[]).includes(u.field)) continue;
     if (!FIELDS.includes(u.field) || !u.evidence.trim() || !message.includes(u.evidence) || u.evidence.length > 600 || u.value.length > 400) continue;
     if (['confirmed', 'estimated'].includes(u.status) && uncertaintyAnswer(u.evidence)) continue;
     const options = BANK[u.field].options;
@@ -187,7 +204,39 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   if (!control && hintedFocus && canApplyHint) {
     s.focus = hintedFocus; s.focusQuote = message.slice(0, 600);
   }
+  // Broad area labels are not a diagnosis. Resolve an unambiguous supported
+  // process at intake; never use a marketing/product mention as evidence.
+  if (!control && (previous.focus === 'discovery' || ['discovery', 'operations'].includes(s.focus)
+    || (s.focus === 'growth' && !usable(s, 'bottleneck'))) && ((usable(s, 'process') && s.facts.process!.turn === s.turn)
+      || (usable(s, 'pain') && s.facts.pain!.turn === s.turn))) {
+    const processQuote = usable(s, 'process') ? s.facts.process!.quote : s.facts.pain!.quote;
+    const candidates: Focus[] = [];
+    const supportedTask = (field: Field) => usable(s, field) && s.facts[field]!.turn === s.turn
+      && [processQuote, usable(s, 'pain') ? s.facts.pain!.quote : ''].filter(Boolean)
+        .some(quote => quote.includes(s.facts[field]!.quote) || s.facts[field]!.quote.includes(quote));
+    for (const [field, focus] of [['call_task','calls'],['docs_task','docs'],['content_gap','content'],['office_task','office'],['web_task','web'],['app_task','app'],['rescue_task','rescue'],['staff_task','staff']] as [Field, Focus][]) {
+      if (supportedTask(field)) candidates.push(focus);
+    }
+    const processHint = focusHint(processQuote);
+    if (val(s, 'docs_task') === 'draft' && /(?:draft|writ)\w*.{0,50}(?:product descriptions|descriptions|social captions|marketing copy)/iu.test(processQuote)
+      && /catalog|publication|publish|product/i.test(processQuote)) {
+      const docsIndex = candidates.indexOf('docs');
+      if (docsIndex !== -1) candidates.splice(docsIndex, 1, 'content');
+    }
+    if (processHint && !candidates.length) candidates.push(processHint);
+    if (new Set(candidates).size === 1) {
+      s.focus = candidates[0]; s.focusQuote = processQuote;
+    }
+  }
   // A switch of investigated process invalidates old process-specific evidence.
+  // If only a broad area is known, one explicit task can identify which branch
+  // to investigate even before the workflow is fully described. This does not
+  // establish volume, impact, readiness or a product recommendation.
+  if (!control && ['discovery', 'operations'].includes(s.focus)) {
+    const tasks = ([['call_task','calls'],['docs_task','docs'],['content_gap','content'],['office_task','office'],['web_task','web'],['app_task','app'],['rescue_task','rescue'],['staff_task','staff']] as [Field, Focus][])
+      .filter(([field]) => usable(s, field));
+    if (tasks.length === 1) { s.focus = tasks[0][1]; s.focusQuote = s.facts[tasks[0][0]]!.quote; }
+  }
   // Current-message evidence can establish the new process; business context stays.
   const revisitingProcess = previous.currentQuestion === 'area' && val(previous, 'priority_check') === 'another' && known(s.facts.area);
   if ((previous.focus !== 'discovery' && s.focus !== previous.focus) || revisitingProcess) {
@@ -198,7 +247,7 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     }
   }
   // An unrelated answer must not consume a question attempt or advance the interview.
-  if (!finish && s.turn < MAX_AUDIT_TURNS && previous.currentQuestion && s.focus === previous.focus && !updates.length && !control) {
+  if (!finish && s.turn < auditTurnLimit(s) && previous.currentQuestion && s.focus === previous.focus && !updates.length && !control) {
     const repeated = previous.history.filter((item) => item.role === 'user').at(-1)?.content.trim() === message.trim();
     if (!repeated) { s.currentQuestion = previous.currentQuestion; return s; }
     // A repeated unanswered statement is a gap, not evidence. Avoid trapping the
@@ -209,11 +258,11 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
     delete s.facts.area; s.asked.area = 0;
   }
   const required = requiredFields(s);
-  const exhausted = finish || s.turn >= MAX_AUDIT_TURNS;
+  const exhausted = finish || s.turn >= auditTurnLimit(s);
   const considered = (f: Field) => settled(s.facts[f]) || (s.asked[f] ?? 0) >= 2;
   const ready = required.every(considered) && (val(s, 'priority_check') !== 'another' || considered('area'));
   if (ready || exhausted) {
-    s.complete = true; s.stopReason = exhausted || required.some((f) => !usable(s, f)) ? 'limited' : 'enough'; s.currentQuestion = null;
+    s.complete = true; s.stopReason = exhausted || required.some((f) => !(s.mode === 'deep' ? deepResolved(s,f) : usable(s, f))) ? 'limited' : 'enough'; s.currentQuestion = null;
     return s;
   }
   const missing = required.filter((f) => !considered(f));
@@ -237,17 +286,23 @@ export function publicFactSummary(s: IntakeState): string[] {
 }
 export function intakeProgress(s: IntakeState) {
   const fields = requiredFields(s);
-  return { covered: fields.filter((f) => usable(s, f)).length, gaps: fields.filter((f) => !usable(s, f)).length, complete: s.complete,
+  return { covered: fields.filter((f) => s.mode === 'deep' ? deepResolved(s,f) : usable(s, f)).length, gaps: fields.filter((f) => !(s.mode === 'deep' ? deepResolved(s,f) : usable(s, f))).length, complete: s.complete,
     phase: s.complete ? 'report' : s.focus === 'discovery' ? 'context' : fields.filter((f) => usable(s, f)).length < 6 ? 'diagnosis' : 'feasibility' };
 }
 export type Verdict = 'measurement_first' | 'process_first' | 'pilot' | 'prepare' | 'not_now' | 'insufficient' | 'scoped_discovery' | 'technical_assessment' | 'human_service' | 'not_available';
 export function assess(s: IntakeState) {
   const evidence = requiredFields(s).filter((f) => usable(s, f));
-  const result = (verdict: Verdict, product: ProductKey | null = null, supported = false) => ({ verdict, product, opportunity: supported ? 'supported' : 'limited',
-    readiness: verdict !== 'measurement_first' && val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints')) ? 'ready' : 'limited', evidence });
+  const depthMissing = deepFieldsFor(s).some(f => !deepResolved(s, f));
+  const depthBlocked = s.mode === 'deep' && (val(s,'permissions') !== 'approved' || val(s,'review_capacity') !== 'available');
+  const result = (verdict: Verdict, product: ProductKey | null = null, supported = false) => ({
+    verdict: product && (depthMissing || depthBlocked) ? 'prepare' as Verdict : verdict,
+    product: depthMissing || depthBlocked ? null : product, opportunity: supported ? 'supported' : 'limited',
+    readiness: !depthMissing && !depthBlocked && verdict !== 'measurement_first' && val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints')) ? 'ready' : 'limited', evidence });
   if (s.focus === 'fleet') return result('not_available');
   if (usable(s, 'business') && ['minor', 'none'].includes(val(s, 'severity'))) return result('not_now');
   if (usable(s, 'business') && s.focus === 'ads' && ['clicks', 'none'].includes(val(s, 'tracking'))) return result('measurement_first');
+  if (usable(s, 'business') && ((s.focus === 'docs' && val(s, 'docs_task') === 'decision')
+    || (s.focus === 'calls' && val(s, 'call_task') === 'expert'))) return result('process_first');
   if (!usable(s, 'business') || !usable(s, 'pain')) return result('insufficient');
   if (['minor', 'none'].includes(val(s, 'severity')) || val(s, 'alternative') === 'solved') return result('not_now');
   if (s.focus === 'attribution' && (['none', 'ask'].includes(val(s, 'attribution')) || ['missing', 'criteria'].includes(val(s, 'reporting_gap')) || ['no', 'partial'].includes(val(s, 'attribution_check')))) return result('measurement_first');
@@ -255,8 +310,13 @@ export function assess(s: IntakeState) {
   if (s.focus === 'calls' && ['cold', 'unclear'].includes(val(s, 'call_permission'))) return result('process_first');
   if (s.focus === 'growth') return result(usable(s, 'bottleneck') ? 'process_first' : 'insufficient');
   if (s.focus === 'attribution') return result(usable(s, 'reporting_gap') ? 'process_first' : 'insufficient');
-  if (val(s, 'call_task') === 'expert' || val(s, 'docs_task') === 'decision'
-    || val(s, 'response') === 'fine' || ['approval', 'none'].includes(val(s, 'content_gap'))) return result('process_first');
+  // A known approval bottleneck or an untried conventional transfer can be
+  // investigated without pretending unknown volume supports an AI purchase.
+  if (s.focus === 'office' && (val(s, 'office_task') === 'approvals'
+    || (['orders', 'transfer'].includes(val(s, 'office_task')) && val(s, 'alternative') === 'not_tried' && usable(s, 'process')))) return result('process_first');
+  if ((s.focus === 'calls' && val(s, 'call_task') === 'expert') || (s.focus === 'docs' && val(s, 'docs_task') === 'decision')
+    || (['chats', 'calls'].includes(s.focus) && val(s, 'response') === 'fine')
+    || (s.focus === 'content' && ['approval', 'none'].includes(val(s, 'content_gap')))) return result('process_first');
   if (requiredFields(s).some((f) => s.facts[f]?.previous && !usable(s, f))) return result('insufficient');
   const hasMaterialCase = BRANCH_FIELDS[s.focus].every((f) => usable(s, f)) && usable(s, 'process') && usable(s, 'scale') && usable(s, 'impact') && val(s, 'severity') === 'material';
   if (s.focus === 'staff') return hasMaterialCase && usable(s, 'owner') ? result('human_service', 'aiSTAFF', true) : result('insufficient');
@@ -277,5 +337,6 @@ export function assess(s: IntakeState) {
   if (val(s, 'alternative') !== 'insufficient') return result('process_first', null, true);
   if (result('prepare').readiness !== 'ready') return result('prepare', null, true);
   const product = PRODUCT_FOR_FOCUS[s.focus];
+  if (depthMissing || depthBlocked) return result('prepare', null, true);
   return product && PRODUCT_CATALOG[product].mode === 'pilot' ? result('pilot', product, true) : result('process_first', null, true);
 }

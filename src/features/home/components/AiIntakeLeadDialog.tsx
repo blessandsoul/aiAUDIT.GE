@@ -98,7 +98,7 @@ export function AiIntakeLeadDialog({
         ) : (
           <form className="aiIntakeLeadForm" onSubmit={handleSubmit} noValidate>
             <DialogHeader>
-              <span className="aiIntakeLeadEyebrow">Quick Audit — შედეგების განხილვა</span>
+              <span className="aiIntakeLeadEyebrow">{intakeState?.mode === 'deep' ? 'Deep Process Audit' : 'Quick Audit'} — შედეგების განხილვა</span>
               <DialogTitle>სად დაგიკავშირდეთ?</DialogTitle>
               <DialogDescription>
                 დატოვეთ ნომერი, თუ გსურთ გუნდთან ერთად შედეგებისა და შემდეგი ნაბიჯის განხილვა.

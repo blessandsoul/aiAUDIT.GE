@@ -7,9 +7,9 @@ import type { PublicScan } from '@/lib/audit-public-sources';
 import type { IntakeState } from '@/lib/audit-engine';
 
 export type ScanPayload = { scan: PublicScan; content: string; suggestions: string[]; intakeState: IntakeState };
-interface Props { isOpen: boolean; onClose: () => void; onApplyScan: (payload: ScanPayload) => void }
+interface Props { isOpen: boolean; onClose: () => void; onApplyScan: (payload: ScanPayload) => void; mode?: 'quick' | 'deep' }
 
-export function ChannelScannerModal({ isOpen, onClose, onApplyScan }: Props) {
+export function ChannelScannerModal({ isOpen, onClose, onApplyScan, mode = 'quick' }: Props) {
   const [website, setWebsite] = useState('');
   const [socials, setSocials] = useState(['', '']);
   const [showSocials, setShowSocials] = useState(false);
@@ -30,7 +30,7 @@ export function ChannelScannerModal({ isOpen, onClose, onApplyScan }: Props) {
     const controller = new AbortController(); abortRef.current = controller;
     setScanning(true); setError(''); setResult(null);
     try {
-      let response = await fetch('/api/ai-intake/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ urls }), signal: controller.signal });
+      let response = await fetch('/api/ai-intake/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ urls, mode }), signal: controller.signal });
       let payload = await response.json();
       if (response.status === 202 && typeof payload.job === 'string') {
         const job = payload.job, deadline = Date.now() + 180_000;

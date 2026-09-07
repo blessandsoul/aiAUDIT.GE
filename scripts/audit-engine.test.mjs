@@ -4,7 +4,26 @@ import { BANK, FIELDS } from '../src/lib/audit-bank.ts';
 import { advanceAudit, assess, createIntakeState, exactChoice, focusHint, isIntakeComplete, questionFor, requiredFields } from '../src/lib/audit-engine.ts';
 import { buildFinalBrief } from '../src/lib/audit-report.ts';
 import { signState, verifyState } from '../src/lib/audit-session.ts';
+import { DEEP_FIELDS } from '../src/lib/audit-deep-bank.ts';
+import { auditTurnLimit, deepFieldsFor, deepResolved } from '../src/lib/audit-engine.ts';
 const empty = { focus: 'discovery', focusEvidence: '', updates: [], nextField: null };
+test('deep mode has its own signed limit and cannot leak fields into quick', () => {
+  const quick = createIntakeState('en');
+  const deep = createIntakeState('en', 'deep');
+  quick.focus = deep.focus = 'chats';
+  assert.equal(auditTurnLimit(quick), 24);
+  assert.equal(auditTurnLimit(deep), 40);
+  assert(DEEP_FIELDS.every(f => requiredFields(deep).includes(f)));
+  assert(DEEP_FIELDS.every(f => !requiredFields(quick).includes(f)));
+  const next = advanceAudit(quick, 'The supervisor owns this process.', { ...empty, updates: [{field:'process_owner', value:'supervisor', status:'confirmed', evidence:'The supervisor owns this process.', correction:false}] });
+  assert.equal(next.facts.process_owner, undefined);
+});
+test('missing deep evidence blocks a product and marks readiness limited', () => {
+  const s = prepared('chats');
+  s.mode = 'deep';
+  assert.equal(assess(s).product, null);
+  assert.equal(assess(s).readiness, 'limited');
+});
 function fact(s, field, value, status = 'confirmed') { s.facts[field] = { id: field+':1', field, value, status, quote: `${field}: ${value}`, turn: 1 }; }
 function prepared(focus) {
   const s = createIntakeState('en'); s.focus = focus; s.turn = 4;
@@ -12,6 +31,37 @@ function prepared(focus) {
   fact(s,'severity','material'); fact(s,'repetition','repeatable'); fact(s,'data','ready'); fact(s,'owner','available'); fact(s,'constraints','review'); fact(s,'alternative','insufficient'); fact(s,'priority_check','primary');
   return s;
 }
+function deepReady() {
+  const s=prepared('chats'); s.mode='deep';
+  for(const f of DEEP_FIELDS) fact(s,f,'reported process detail');
+  fact(s,'permissions','approved');fact(s,'review_capacity','available');
+  return s;
+}
+test('Deep permits a prepared pilot only with actual permission and capacity',()=>{
+  assert.equal(assess(deepReady()).verdict,'pilot');
+  for(const [field,value] of [['permissions','pending'],['permissions','denied'],['permissions','the director must approve'],['review_capacity','unavailable'],['review_capacity','thirty minutes tomorrow maybe']]) {
+    const s=deepReady();fact(s,field,value);
+    assert.equal(assess(s).verdict,'prepare',field+value);assert.equal(assess(s).product,null);assert.equal(assess(s).readiness,'limited');
+  }
+});
+test('inapplicable optional facts close gaps without granting permission',()=>{
+  const s=deepReady();fact(s,'personal_data','','not_applicable');
+  s.facts.personal_data.quote='No personal data is involved.';
+  assert(deepResolved(s,'personal_data'));assert.equal(assess(s).verdict,'pilot');
+  assert(buildFinalBrief(s,'en').includes('not applicable to this process'));
+  fact(s,'permissions','','not_applicable');assert.equal(assess(s).verdict,'prepare');
+});
+test('measurement and approval paths do not require an entire AI implementation questionnaire',()=>{
+  const s=createIntakeState('en','deep');s.focus='ads';fact(s,'tracking','clicks');
+  assert.equal(deepFieldsFor(s).length,8);assert(!requiredFields(s).includes('adoption'));
+  s.focus='office';fact(s,'office_task','approvals');assert(!requiredFields(s).includes('retention'));
+  fact(s,'severity','minor');assert.equal(deepFieldsFor(s).length,0);
+});
+test('Deep report has ordered check, scope and stop steps with quoted evidence',()=>{
+  const s=deepReady();const report=buildFinalBrief(s,'en');
+  assert(report.indexOf('Step 1')<report.indexOf('Step 2'));assert(report.indexOf('Step 2')<report.indexOf('Step 3'));
+  fact(s,'permissions','pending');assert(buildFinalBrief(s,'en').includes('Do not start an AI pilot yet'));
+});
 test('question owns its exact choices across every field and language', () => {
   for (const language of ['ka','ru','en']) for (const field of FIELDS) {
     const s = createIntakeState(language); s.currentQuestion = field;
