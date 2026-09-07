@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+const base=process.env.AUDIT_TEST_URL || 'http://localhost:3358';
+const post=(mode,intakeState,content='We run a bicycle repair shop. Repeated booking messages wait overnight.')=>fetch(base+'/api/ai-intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,intakeState,messages:[{role:'user',content}]}),signal:AbortSignal.timeout(65000)});
+assert.equal((await post('invalid')).status,400);
+const first=await post('deep');assert.equal(first.status,200);
+const {intakeState}=await first.json();assert.equal(intakeState.mode,'deep');
+assert.equal((await post('quick',intakeState)).status,409);
+const changed=structuredClone(intakeState);changed.mode='quick';
+assert.equal((await post('quick',changed)).status,409);
+const next=await post(undefined,intakeState,'I do not know');assert.equal(next.status,200);
+const payload=await next.json();assert.equal(payload.intakeState.mode,'deep');
+assert.equal(payload.intakeState.facts[intakeState.currentQuestion].status,'unknown');
+console.log('PASS: invalid mode, signed Deep, switch rejection, tamper rejection, unknown preserves Deep. No lead submitted.');

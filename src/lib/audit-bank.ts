@@ -1,3 +1,4 @@
+import { DEEP_BANK } from './audit-deep-bank.ts';
 export type Language = 'ka' | 'ru' | 'en';
 export type Localized = Record<Language, string>;
 export const l = (ka: string, ru: string, en: string): Localized => ({ ka, ru, en });
@@ -13,6 +14,7 @@ export const DECLINED = l('გამოტოვება', 'Пропустит�
 // One semantic question owns both its wording and its answer choices. Free text
 // remains available; quantities, deadlines and job titles are never prefilled.
 export const BANK = {
+  ...DEEP_BANK,
   business: q('Specific product or service sold. Renovation services alone is confirmed; customer identity is a SEPARATE field. Bare shop, company or service with no kind is partial. Do not replace a specific known business with a generic restatement.', 'კონკრეტულად რას სთავაზობს თქვენი კომპანია მომხმარებელს?', 'Что конкретно предлагает ваша компания?', 'What specifically does your company offer?'),
   customer: q('Actual customer type. Never infer homeowners from renovation services, or patients from a channel. Unknown if not stated.', 'ვინ არის თქვენი ძირითადი მომხმარებელი?', 'Кто ваш основной покупатель?', 'Who is your main customer?'),
   objective: q('Desired outcome, not a proven result.', 'რომელი შედეგის გაუმჯობესებაა ახლა თქვენთვის ყველაზე მნიშვნელოვანი?', 'Какой результат сейчас важнее всего улучшить?', 'Which result matters most to improve right now?'),

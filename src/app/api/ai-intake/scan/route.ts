@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       chunks.push(value);
     }
     const input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if (input.mode !== undefined && input.mode !== 'quick' && input.mode !== 'deep') throw new Error('Invalid audit mode');
     if (!Array.isArray(input.urls) || !input.urls.length || input.urls.length > 4 || input.urls.some((u: unknown) => typeof u !== 'string')) throw new Error('Invalid URLs');
     const urls = [...new Set<string>(input.urls.map((u: string) => publicUrl(u.trim()).href))];
     const networks = urls.map((url) => socialProfile(url)?.network).filter(Boolean);
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     const review = await reviewSources(sources, AbortSignal.timeout(25_000));
     // Store only selected quotes (not full scraped pages) in the signed session.
     const scan: PublicScan = { ...review, sources: sources.map((s) => ({ ...s, excerpt: s.provider === 'apify' ? s.excerpt : '' })) };
-    const state = createIntakeState('ka');
+    const state = createIntakeState('ka', input.mode === 'deep' ? 'deep' : 'quick');
     state.publicScan = scan; state.currentQuestion = 'business'; state.asked.business = 1;
     const question = questionFor(state)!;
     const prefix = review.observations.length

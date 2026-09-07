@@ -81,7 +81,7 @@ export function buildIntakeLeadTelegramMessages(params: {
   });
 
   const header = [
-    '🧭 ახალი Quick Audit (aiAUDIT.ge)',
+    `🧭 ახალი ${state.mode === 'deep' ? 'Deep Process Audit' : 'Quick Audit'} (aiAUDIT.ge)`,
     '',
     `ლიდის კოდი: ${leadId}`,
     `ტელეფონი: ${params.phone}`,
