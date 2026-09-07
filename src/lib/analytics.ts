@@ -8,7 +8,8 @@ export type LeadForm =
   | "contact"
   | "homepage_cta"
   | "aistaff_gate"
-  | "aistaff_bot";
+  | "aistaff_bot"
+  | "audit_intake";
 
 type AnalyticsWindow = Window & {
   dataLayer?: unknown[];

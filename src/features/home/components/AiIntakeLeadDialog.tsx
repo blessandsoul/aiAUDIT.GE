@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+
+import { createLeadEventId, trackLead } from '@/lib/analytics';
 
 import {
   Dialog,
@@ -37,6 +39,7 @@ export function AiIntakeLeadDialog({
   const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<'idle' | 'sending' | 'success'>('idle');
   const [error, setError] = useState('');
+  const leadEventIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (open && status !== 'success') setError('');
@@ -59,6 +62,8 @@ export function AiIntakeLeadDialog({
 
     setError('');
     setStatus('sending');
+    const leadEventId = leadEventIdRef.current ?? createLeadEventId();
+    leadEventIdRef.current = leadEventId;
     try {
       const response = await fetch('/api/ai-intake/lead', {
         method: 'POST',
@@ -73,6 +78,8 @@ export function AiIntakeLeadDialog({
         }),
       });
       if (!response.ok) throw new Error('Lead delivery failed');
+      trackLead('audit_intake', leadEventId);
+      leadEventIdRef.current = null;
       setStatus('success');
       onSubmitted();
     } catch {
