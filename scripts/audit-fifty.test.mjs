@@ -21,7 +21,7 @@ function put(s, field, value, status='confirmed') {
 function prepared(focus, changes={}) {
   const s=createIntakeState('en');s.focus=focus;s.turn=8;
   for(const f of requiredFields(s)) put(s,f,BANK[f].options[0]?.value || `Observed ${f} for this business`);
-  for(const [f,v] of Object.entries({business:'Business with a repeated operational workflow',severity:'material',repetition:'repeatable',data:'ready',owner:'available',constraints:'review',alternative:'insufficient',priority_check:'primary',...(focus==='ads'?{acquisition:'paid',tracking:'purchases'}:{}),...changes})) {
+  for(const [f,v] of Object.entries({business:'Business with a repeated operational workflow',severity:'material',repetition:'repeatable',data:'ready',owner:'available',constraints:'review',alternative:'insufficient',priority_check:'primary',...(focus==='chats'?{baseline:'60 messages, response within one hour'}:{}),...(focus==='ads'?{acquisition:'paid',tracking:'purchases'}:{}),...changes})) {
     if(v===null) {
       put(s,f,'unresolved','contradicted');s.facts[f].previous={value:'old estimate',quote:'Earlier estimate',turn:1};
     } else put(s,f,v);
@@ -32,7 +32,8 @@ function check(s, verdict, product, requiredPattern) {
   const a=assess(s);assert.equal(a.verdict,verdict);assert.equal(a.product,product);
   for(const language of ['en','ru','ka']) {
     const report=buildFinalBrief(s,language);
-    assert(report.includes('[business:1]'));
+    assert(report.includes('Business with a repeated operational workflow'));
+    assert(!/\[[a-z_]+:\d+\]/u.test(report));
     assert(!/37%|4,000 GEL/.test(report));
     if(requiredPattern && language==='en')assert.match(report,requiredPattern);
     if(verdict==='pilot')assert.match(report,/14/);

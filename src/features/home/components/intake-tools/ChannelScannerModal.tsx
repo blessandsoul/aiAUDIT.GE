@@ -49,7 +49,7 @@ export function ChannelScannerModal({ isOpen, onClose, onApplyScan, mode = 'quic
     } finally { if (abortRef.current === controller) setScanning(false); }
   }
 
-  return <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+  return <Dialog open={isOpen} onOpenChange={(open: boolean) => { if (!open) onClose(); }}>
     <DialogContent className="sourceDialog z-[2147483645] max-h-[88dvh] overflow-y-auto rounded-2xl bg-white p-6 sm:max-w-xl" overlayClassName="z-[2147483644] bg-slate-950/40 backdrop-blur-sm">
       <div className="flex items-center gap-3 pr-6">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><Globe size={20} /></span>

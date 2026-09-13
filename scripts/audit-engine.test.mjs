@@ -28,6 +28,7 @@ function fact(s, field, value, status = 'confirmed') { s.facts[field] = { id: fi
 function prepared(focus) {
   const s = createIntakeState('en'); s.focus = focus; s.turn = 4;
   for (const field of requiredFields(s)) fact(s, field, BANK[field].options[0]?.value || 'reported operational fact');
+  if (focus === 'chats') fact(s, 'baseline', 'current response time is measured');
   fact(s,'severity','material'); fact(s,'repetition','repeatable'); fact(s,'data','ready'); fact(s,'owner','available'); fact(s,'constraints','review'); fact(s,'alternative','insufficient'); fact(s,'priority_check','primary');
   return s;
 }
@@ -113,7 +114,7 @@ test('exhausted audit ends with limited report, not invented completion',()=>{
 });
 test('all three reports include evidence, next step, metrics and uncertainty',()=>{
   const s=prepared('attribution');fact(s,'attribution','none');
-  for(const lang of ['ka','ru','en']){const report=buildFinalBrief(s,lang);assert(report.includes('[attribution:1]'));assert(report.includes('ROI'));assert(!/37%|4000|4,000/.test(report));}
+  for(const lang of ['ka','ru','en']){const report=buildFinalBrief(s,lang);assert(report.includes('“attribution: none”'));assert(!/\[[a-z_]+:\d+\]/u.test(report));assert(report.includes('ROI'));assert(!/37%|4000|4,000/.test(report));}
 });
 test('tampered, expired and unsigned state are rejected',()=>{
   process.env.AUDIT_SESSION_SECRET='test-only-secret-with-at-least-32-characters';
@@ -210,6 +211,93 @@ test('explicit correction changes process and drops old workload and readiness',
 test('pilot uses client baseline and human boundary before evidence appendix',()=>{
   const s=prepared('chats');fact(s,'response','delays');fact(s,'baseline','90 evening enquiries, 11 hours');fact(s,'constraints','review');
   s.facts.baseline.quote='Вечером 90 обращений, ответ через 11 часов';s.facts.constraints.quote='Лечение — только врач';
-  const report=buildFinalBrief(s,'ru');assert(report.includes('С чем сравнивать результат: [baseline:1]'));assert(report.includes('Лечение — только врач'));
+  const report=buildFinalBrief(s,'ru');assert(report.includes('С чем сравнивать результат: “Вечером 90 обращений, ответ через 11 часов”'));assert(!/\[[a-z_]+:\d+\]/u.test(report));assert(report.includes('Лечение — только врач'));
   assert(!report.includes('до старта измерьте исходный результат'));assert(report.indexOf('С чем сравнивать')<report.indexOf('Основания — ваши слова'));
+});
+
+test('neutral all-caps system names keep the current Georgian language',()=>{
+  const s=createIntakeState('ka');s.currentQuestion='data';
+  const next=advanceAudit(s,'GOOGLE SHEETS',empty);
+  assert.equal(next.language,'ka');
+  const q=questionFor({...next,currentQuestion:'data',asked:{...next.asked,data:1},facts:{...next.facts,systems:{id:'systems:1',field:'systems',value:'Google Sheets',status:'confirmed',quote:'GOOGLE SHEETS',turn:1}}});
+  assert.match(q.content,/არის|ხელმისაწვდომია/u);assert.doesNotMatch(q.content,/You said|Are real examples/u);
+});
+
+test('explicit social autoresponder request routes to Chats even if the model chose a generic route',()=>{
+  const message='ვყიდი ტანსაცმელს და მინდა ავტომოპასუხე სოც ქსელებში';
+  const s=advanceAudit(createIntakeState('ka'),message,{...empty,focus:'operations',focusEvidence:message});
+  assert.equal(s.focus,'chats');
+});
+
+test('repeated Chats workflow clarification confirms where the tracking-code error happened',()=>{
+  const s=createIntakeState('ka');s.focus='chats';s.currentQuestion='process';s.asked.process=2;
+  s.facts.pain={id:'pain:3',field:'pain',value:'tracking code sent incorrectly',status:'confirmed',quote:'არასწორი თრექინგ კოდი მივწერე მომხმარებელს',turn:3};
+  s.facts.impact={id:'impact:4',field:'impact',value:'operator salary 700 GEL',status:'confirmed',quote:'ოპერატორი მყავს რომელსაც 700 ლარს ვუხდი',turn:4};
+  const q=questionFor(s);
+  assert.match(q.content,/თქვენ ახსენეთ.*თრექინგ/u);assert.match(q.content,/სოციალურ ქსელში პასუხისას მოხდა/u);
+  assert.doesNotMatch(q.content,/You said|tracking code|\[pain:/iu);
+});
+
+test('a non-tracking code never invents a tracking-code follow-up',()=>{
+  const s=createIntakeState('ka');s.focus='chats';s.currentQuestion='process';s.asked.process=2;
+  s.facts.pain={id:'pain:3',field:'pain',value:'promo code confusion',status:'confirmed',quote:'ფასდაკლების კოდი ავურიეთ',turn:3};
+  const q=questionFor(s);
+  assert.doesNotMatch(q.content,/თრექინგ|ტრექინგ/u);assert.match(q.content,/შეტყობინების მიღებიდან პასუხის გაგზავნამდე/u);
+});
+
+test('a routine tracking-code workflow never becomes an incorrect-code incident',()=>{
+  const s=createIntakeState('ka');s.focus='chats';s.currentQuestion='process';s.asked.process=2;
+  s.facts.pain={id:'pain:3',field:'pain',value:'tracking lookup delays replies',status:'confirmed',quote:'თრექინგ კოდს შეკვეთიდან ვაკოპირებთ და პასუხი გვიანდება',turn:3};
+  const q=questionFor(s);
+  assert.doesNotMatch(q.content,/არასწორად გაგზავნილი თრექინგ/u);assert.match(q.content,/შეტყობინების მიღებიდან პასუხის გაგზავნამდე/u);
+  const preparedState=createIntakeState('ka');preparedState.focus='chats';preparedState.focusQuote='მინდა ავტომოპასუხე სოციალურ ქსელში';preparedState.complete=true;
+  const reported=(field,value,quote,status='confirmed')=>{preparedState.facts[field]={id:`${field}:2`,field,value,status,quote,turn:2};};
+  reported('business','clothing store','ვყიდი ტანსაცმელს');reported('objective','social autoresponder','მინდა ავტომოპასუხე სოციალურ ქსელში');reported('pain','tracking lookup delays replies','თრექინგ კოდს შეკვეთიდან ვაკოპირებთ და პასუხი გვიანდება');reported('response','delays','პასუხი გვიანდება');reported('repetition','repeatable','უმეტესად მსგავსი შემთხვევაა');reported('process','','არ ვიცი','unknown');reported('scale','40 hours per week','კვირაში 40 საათი');reported('impact','','არ ვიცი','unknown');reported('severity','material','რეგულარულად გვაკარგვინებს დროს ან შესაძლებლობას');reported('systems','inbox','Instagram inbox');reported('data','ready','კი, შეგვიძლია მოვამზადოთ');reported('alternative','insufficient','ვცადეთ, მაგრამ პრობლემა დარჩა');reported('owner','available','პასუხისმგებელი ადამიანი გვყავს');reported('constraints','review','შედეგს ადამიანი დაამტკიცებს');reported('priority_check','primary','ეს არის მთავარი პრიორიტეტი');
+  const report=buildFinalBrief(preparedState,'ka');assert.doesNotMatch(report,/არასწორი თრექინგ-კოდის შემთხვევები|კოდის სანდო წყარო/u);
+});
+
+test('clothing social-autoresponder scenario produces a bounded Chats preparation report',()=>{
+  const s=createIntakeState('ka');s.focus='chats';s.turn=16;s.complete=true;s.stopReason='enough';
+  s.focusQuote='ვყიდი ტანსაცმელს და მინდა ავტომოპასუხე სოც ქსელებში';
+  const reported=(field,value,quote,status='confirmed')=>{s.facts[field]={id:`${field}:7`,field,value,status,quote,turn:7};};
+  reported('business','clothing store','ვყიდი ტანსაცმელს');
+  reported('objective','social autoresponder','მინდა ავტომოპასუხე სოც ქსელებში');
+  reported('pain','tracking-code error','არასწორი თრექინგ კოდი მივწერე მომხმარებელს');
+  reported('response','delays','პასუხი გვიანდება');
+  reported('repetition','repeatable','უმეტესად მსგავსი შემთხვევაა');
+  reported('process','','არ ვიცი','unknown');s.asked.process=2;
+  reported('scale','40 hours per week','კვირაში 40 საათი');
+  reported('impact','operator paid 700 GEL','ოპერატორი მყავს რომელსაც 700 ლარს ვუხდი');
+  reported('severity','material','რეგულარულად გვაკარგვინებს დროს ან შესაძლებლობას');
+  reported('systems','Google Sheets','GOOGLE SHEETS');
+  reported('data','ready','Yes, we can prepare them');
+  reported('alternative','insufficient','ვცადე, მაგრამ არ გამოვიდა');
+  reported('owner','available','პასუხისმგებელი ადამიანი გვყავს');
+  reported('constraints','review','შედეგს ადამიანი დაამტკიცებს');
+  reported('priority_check','primary','ეს არის მთავარი პრიორიტეტი');
+  s.facts.baseline={id:'baseline:7',field:'baseline',value:'',status:'unknown',quote:'არ ვიცი',turn:7};
+  const a=assess(s);assert.equal(a.verdict,'prepare');assert.equal(a.product,'aiCHATS');assert.equal(a.opportunity,'supported');assert.equal(a.readiness,'limited');
+  const report=buildFinalBrief(s,'ka');
+  assert.match(report,/aiCHATS.*ჯერ არ დაიწყოთ პილოტი ან ავტომატური გაგზავნა/u);
+  assert.match(report,/ჯერ არ ჩართოთ ავტომატური გაგზავნა/u);
+  assert.match(report,/საწყისი პასუხის დრო/u);assert.match(report,/არასწორი თრექინგ-კოდის შემთხვევები/u);
+  assert.match(report,/საწყისი მაჩვენებლები/u);assert.match(report,/ანაზღაურება ხარჯის კონტექსტია და არა დადასტურებული დანაკარგი/u);
+  assert.doesNotMatch(report,/გაყიდვები გაორმაგ|დაზოგავთ 700|\[[a-z_]+:\d+\]/u);
+});
+
+test('fully evidenced social-autoresponder case can advance from preparation to a Chats pilot',()=>{
+  const s=prepared('chats');s.focusQuote='We need an auto responder on Instagram social media.';
+  fact(s,'response','delays');fact(s,'repetition','repeatable');fact(s,'process','Messages are checked, product details are verified, then a reply is sent.');
+  fact(s,'impact','Two hours of operator time are lost each day.');fact(s,'baseline','Median first reply is 45 minutes.');
+  assert.equal(assess(s).verdict,'pilot');assert.equal(assess(s).product,'aiCHATS');
+});
+
+test('FAQ-only Chats preparation does not invent tracking or salary context',()=>{
+  const s=createIntakeState('ka');s.focus='chats';s.focusQuote='მინდა ავტომოპასუხე სოციალურ ქსელში';s.complete=true;
+  const reported=(field,value,quote,status='confirmed')=>{s.facts[field]={id:`${field}:2`,field,value,status,quote,turn:2};};
+  reported('business','clothing store','ვყიდი ტანსაცმელს');reported('objective','social autoresponder','მინდა ავტომოპასუხე სოციალურ ქსელში');
+  reported('pain','delayed answers','ხშირად გვიან ვპასუხობთ კითხვებს');reported('response','delays','პასუხი გვიანდება');reported('repetition','repeatable','უმეტესად მსგავსი შემთხვევაა');
+  reported('process','','არ ვიცი','unknown');reported('scale','40 hours per week','კვირაში 40 საათი');reported('impact','','არ ვიცი','unknown');reported('severity','material','რეგულარულად გვაკარგვინებს დროს ან შესაძლებლობას');
+  reported('systems','inbox','Instagram inbox');reported('data','ready','კი, შეგვიძლია მოვამზადოთ');reported('alternative','insufficient','ვცადეთ, მაგრამ პრობლემა დარჩა');reported('owner','available','პასუხისმგებელი ადამიანი გვყავს');reported('constraints','review','შედეგს ადამიანი დაამტკიცებს');reported('priority_check','primary','ეს არის მთავარი პრიორიტეტი');
+  const report=buildFinalBrief(s,'ka');assert.equal(assess(s).product,'aiCHATS');assert.doesNotMatch(report,/თრექინგ|ტრექინგ|ანაზღაურება/u);assert.match(report,/ჯერ არ ჩართოთ ავტომატური გაგზავნა/u);
 });

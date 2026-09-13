@@ -49,7 +49,13 @@ export function parseIntakeState(value: unknown): IntakeState {
 export function languageOf(text: string, previous: Language = 'ka'): Language {
   if (/[\u10a0-\u10ff]/u.test(text)) return 'ka';
   if (/[\u0400-\u04ff]/u.test(text)) return 'ru';
-  if (/[a-z]{3}/iu.test(text)) return 'en';
+  // Tool names, acronyms and all-caps labels (for example "GOOGLE SHEETS")
+  // are common inside Georgian answers. They are not evidence that the person
+  // wants to switch the conversation language.
+  const latin = text.match(/[a-z]/giu) ?? [];
+  const englishSentence = /\b(?:i|we|you|they|the|a|an|is|are|was|were|have|has|had|can|could|will|would|do|does|did|and|but|because|with|for|from|to|in|on|of|my|our|your|yes|no|not|don't|can't|it's|this|that)\b/iu.test(text);
+  const labelOnly = /^[A-Z0-9][A-Z0-9\s._&/-]{1,39}$/u.test(text.trim());
+  if (!labelOnly && latin.length >= 4 && (englishSentence || latin.length >= 24)) return 'en';
   return previous;
 }
 export function deepFieldsFor(s: IntakeState): Field[] {
@@ -84,6 +90,10 @@ function requiredBase(s: IntakeState): Field[] {
   if (['none', 'minor'].includes(val(s, 'severity'))) return [...new Set<Field>([...core, 'priority_check'])];
   if (s.focus === 'growth') return [...new Set<Field>([...core, 'customer', 'systems', 'priority_check'])];
   if (s.focus === 'attribution') return [...new Set<Field>([...core, 'systems', 'baseline', 'priority_check'])];
+  // A Quick Chats audit can decide whether a safe preparation step is warranted
+  // without forcing a guessed baseline. The report still calls the missing
+  // baseline out explicitly, and assess() will not authorize a pilot without it.
+  if (s.mode !== 'deep' && s.focus === 'chats') return [...new Set<Field>([...core, 'systems', 'data', 'alternative', 'owner', 'constraints', 'priority_check'])];
   // A human service, bespoke discovery, existing-app assessment and an unavailable
   // fleet direction do not need to masquerade as a ready-to-run AI automation.
   if (s.focus === 'staff') return [...new Set<Field>([...core, 'owner', 'priority_check'])];
@@ -97,6 +107,24 @@ export function questionFor(s: IntakeState): { field: Field; content: string; su
   let content = question.text[s.language];
   const renovation = /სარემონტო|რემონტ|ремонт|renovat/iu.test(val(s, 'business'));
   if (field === 'loss_stage' && renovation) content = l('ბოლო მომხმარებელი რომელ ეტაპზე შეჩერდა — პირველი ფასის, ადგილზე დათვალიერების თუ დეტალური ხარჯთაღრიცხვის შემდეგ?', 'Последний клиент остановился после первой цены, осмотра объекта или подробной сметы?', 'Did the last customer stop after the initial price, the site visit, or the detailed estimate?')[s.language];
+  // A tracking code is a normal part of many order flows. Only treat it as a
+  // risk when the same client statement also reports an actual error.
+  const trackingIncident = (text: string) => /თრექინგ|ტრექინგ|tracking\s*(?:code|number)|код\s*отслеж/iu.test(text)
+    && /არასწორ|შეცდომ|wrong|incorrect|mistake|error|невер|ошиб/iu.test(text);
+  const trackingIncidentMentioned = Object.values(s.facts).some((item) => trackingIncident(item?.quote ?? ''));
+  if (field === 'process' && s.focus === 'chats' && (s.asked.process ?? 0) > 1) {
+    content = trackingIncidentMentioned
+      ? l(
+        'თქვენ ახსენეთ არასწორად გაგზავნილი თრექინგ-კოდი. ეს შეცდომა სოციალურ ქსელში პასუხისას მოხდა, თუ შეკვეთის ან მიწოდების სხვა ეტაპზე?',
+        'Вы упомянули неверно отправленный код отслеживания. Ошибка произошла при ответе в социальной сети или на другом этапе заказа либо доставки?',
+        'You mentioned a tracking code sent incorrectly. Did this happen while replying on social media, or at another order or delivery step?'
+      )[s.language]
+      : l(
+        'შეტყობინების მიღებიდან პასუხის გაგზავნამდე რომელი ნაბიჯებია ყველაზე მნიშვნელოვანი — პროდუქტის ან შეკვეთის მოძიება, ინფორმაციის გადამოწმება თუ პასუხის მომზადება?',
+        'Какие шаги важнее всего от получения сообщения до ответа: найти товар или заказ, проверить сведения или подготовить ответ?',
+        'Which steps matter most from receiving a message to replying: finding the product or order, checking the details, or preparing the reply?'
+      )[s.language];
+  }
   if (fact?.previous && fact.status === 'partial') {
     content = l(`ადრე თქვით: „${fact.previous.quote}“, ახლა კი: „${fact.quote}“. ეს შესწორებაა თუ სხვადასხვა პერიოდს ან პროცესს გულისხმობთ?`, `Ранее: «${fact.previous.quote}». Сейчас: «${fact.quote}». Это исправление или речь о разных периодах либо процессах?`, `Earlier: “${fact.previous.quote}”. Now: “${fact.quote}”. Is this a correction, or do these describe different periods or processes?`)[s.language];
   } else if (fact?.status === 'contradicted' && fact.previous) {
@@ -141,7 +169,7 @@ export function focusHint(message: string): Focus | null {
   if (/საიტ|website|web.?site|лендинг/u.test(text)) return 'web';
   if (/შეკვეთ.{0,80}(?:excel|таблиц|სისტემ)|approval|დამტკიც|ручн.{0,15}(?:перенос|ввод)|ხელით.{0,50}(?:გადატან|შეყვან)/u.test(text)) return 'office';
   if (/(?<!\p{L})(?:ზარ(?:ი|ები|ებით|ების|ებს|ზე)|ვურეკავთ|ურეკავს|телефон\p{L}*|звон\p{L}*|calls?)(?!\p{L})/u.test(text)) return 'calls';
-  if (/instagram|whatsapp|messenger|ვწერთ|შეტყობინ|сообщен|chat/u.test(text)) return 'chats';
+  if (/ავტომოპასუხ|автоответчик|auto.?respon(?:der|se)|auto.?reply|automatic repl|social.{0,20}(?:network|media)|სოც(?:იალურ)?\s*ქსელ|(?:instagram|whatsapp|messenger)|ვწერთ|შეტყობინ|сообщен|соцсет|chat/u.test(text)) return 'chats';
   return null;
 }
 export function exactChoice(s: IntakeState, message: string): Update | null {
@@ -199,7 +227,10 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   const hintedFocus = focusHint(message);
   // A direct first-turn product/process signal must beat a generic model route
   // such as "operations". It must not overwrite a later, specific diagnosis.
-  const canApplyHint = s.turn === 1 && ((s.focus === 'operations' && hintedFocus === 'office')
+  const explicitChatIntent = hintedFocus === 'chats' && /ავტომოპასუხ|автоответчик|auto.?respon(?:der|se)|auto.?reply|automatic repl/iu.test(message)
+    && /(?:სოც(?:იალურ)?\s*ქსელ|social.{0,20}(?:network|media)|соцсет|instagram|facebook|whatsapp|messenger)/iu.test(message);
+  const canApplyHint = s.turn === 1 && (explicitChatIntent
+    || (s.focus === 'operations' && hintedFocus === 'office')
     || (s.focus === 'discovery' && hintedFocus === 'fleet'));
   if (!control && hintedFocus && canApplyHint) {
     s.focus = hintedFocus; s.focusQuote = message.slice(0, 600);
@@ -297,7 +328,7 @@ export function assess(s: IntakeState) {
   const result = (verdict: Verdict, product: ProductKey | null = null, supported = false) => ({
     verdict: product && (depthMissing || depthBlocked) ? 'prepare' as Verdict : verdict,
     product: depthMissing || depthBlocked ? null : product, opportunity: supported ? 'supported' : 'limited',
-    readiness: !depthMissing && !depthBlocked && verdict !== 'measurement_first' && val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints')) ? 'ready' : 'limited', evidence });
+    readiness: !depthMissing && !depthBlocked && !['measurement_first', 'prepare'].includes(verdict) && val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints')) ? 'ready' : 'limited', evidence });
   if (s.focus === 'fleet') return result('not_available');
   if (usable(s, 'business') && ['minor', 'none'].includes(val(s, 'severity'))) return result('not_now');
   if (usable(s, 'business') && s.focus === 'ads' && ['clicks', 'none'].includes(val(s, 'tracking'))) return result('measurement_first');
@@ -318,6 +349,15 @@ export function assess(s: IntakeState) {
     || (['chats', 'calls'].includes(s.focus) && val(s, 'response') === 'fine')
     || (s.focus === 'content' && ['approval', 'none'].includes(val(s, 'content_gap')))) return result('process_first');
   if (requiredFields(s).some((f) => s.facts[f]?.previous && !usable(s, f))) return result('insufficient');
+  const chatIntent = [s.focusQuote, s.facts.objective?.quote, s.facts.pain?.quote].filter(Boolean).join(' ');
+  const explicitlyWantsSocialAutoReply = /ავტომოპასუხ|ავტომატურ.{0,25}პასუხ|auto.?respon(?:der|se)|auto.?reply|automatic repl|автоответчик|автоматическ.{0,25}ответ/iu.test(chatIntent)
+    && /სოც(?:იალურ)?\s*ქსელ|social.{0,20}(?:network|media)|соцсет|instagram|facebook|whatsapp|messenger/iu.test(chatIntent);
+  const safeChatsPreparation = s.mode !== 'deep' && s.focus === 'chats' && explicitlyWantsSocialAutoReply
+    && ['delays', 'missed'].includes(val(s, 'response')) && ['repeatable', 'mixed'].includes(val(s, 'repetition'))
+    && val(s, 'severity') === 'material' && usable(s, 'scale') && val(s, 'data') === 'ready'
+    && val(s, 'owner') === 'available' && val(s, 'constraints') === 'review' && val(s, 'alternative') === 'insufficient'
+    && (!usable(s, 'process') || !usable(s, 'impact') || !usable(s, 'baseline'));
+  if (safeChatsPreparation) return { ...result('prepare', 'aiCHATS', true), readiness: 'limited' as const };
   const hasMaterialCase = BRANCH_FIELDS[s.focus].every((f) => usable(s, f)) && usable(s, 'process') && usable(s, 'scale') && usable(s, 'impact') && val(s, 'severity') === 'material';
   if (s.focus === 'staff') return hasMaterialCase && usable(s, 'owner') ? result('human_service', 'aiSTAFF', true) : result('insufficient');
   if (s.focus === 'app') {
@@ -335,8 +375,10 @@ export function assess(s: IntakeState) {
   if (!supported) return result('insufficient');
   if (val(s, 'constraints') === 'high_risk') return result('prepare', null, true);
   if (val(s, 'alternative') !== 'insufficient') return result('process_first', null, true);
-  if (result('prepare').readiness !== 'ready') return result('prepare', null, true);
+  const pilotReadiness = val(s, 'data') === 'ready' && val(s, 'owner') === 'available' && ['review', 'low_risk'].includes(val(s, 'constraints'));
+  if (!pilotReadiness) return result('prepare', null, true);
   const product = PRODUCT_FOR_FOCUS[s.focus];
+  if (s.focus === 'chats' && !usable(s, 'baseline')) return result('prepare', product ?? null, true);
   if (depthMissing || depthBlocked) return result('prepare', null, true);
   return product && PRODUCT_CATALOG[product].mode === 'pilot' ? result('pilot', product, true) : result('process_first', null, true);
 }

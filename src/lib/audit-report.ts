@@ -8,7 +8,7 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
   const t = (ka: string, ru: string, en: string) => l(ka, ru, en)[language];
   const evidence = (fields: Field[]) => fields.filter((f) => usable(s, f) || (s.mode === 'deep' && deepResolved(s,f))).map((f) => {
     const fact = s.facts[f]!;
-    return `• [${fact.id}] “${fact.quote}”${fact.status === 'not_applicable' ? t(' — არ ეხება ამ პროცესს', ' — не применимо к этому процессу', ' — not applicable to this process') : fact.status === 'estimated' ? t(' — თქვენი შეფასება', ' — ваша оценка', ' — your estimate') : ''}`;
+    return `• “${fact.quote}”${fact.status === 'not_applicable' ? t(' — არ ეხება ამ პროცესს', ' — не применимо к этому процессу', ' — not applicable to this process') : fact.status === 'estimated' ? t(' — თქვენი შეფასება', ' — ваша оценка', ' — your estimate') : ''}`;
   }).join('\n');
   const findings: Record<Verdict, string> = {
     measurement_first: t('პირველი ნაბიჯი გაზომვის წესისა და წყაროს მონაცემების გამართვაა. მიღებული პასუხები ჯერ არ იძლევა სანდო საფუძველს AI-ით ოპტიმიზაციისთვის.', 'Первый шаг — наладить измерение и исходные данные. Ответы пока не дают надёжной основы для оптимизации с AI.', 'Start with measurement and source data. The answers do not yet establish a reliable basis for AI optimization.'),
@@ -27,6 +27,13 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
   let caution = t('შედეგი შეამოწმოს ადამიანმა. დროის დაზოგვა ავტომატურად არ ნიშნავს ფულად ეკონომიას.', 'Результат проверяет человек. Высвобождение времени не равно денежной экономии.', 'A person should review results. Time released does not automatically mean cash savings.');
   let diagnosis = '';
   let decision = '';
+  const chatsPreparation = s.focus === 'chats' && a.product === 'aiCHATS' && a.verdict === 'prepare';
+  const staffCostContext = /(?:ოპერატორ|თანამშრომ|ხელფას|ანაზღაურ|salary|wage|staff cost|employee cost)/iu.test(s.facts.impact?.quote ?? '')
+    && /\d/u.test(s.facts.impact?.quote ?? '');
+  const trackingCodeContext = [s.facts.pain?.quote, s.facts.process?.quote, s.facts.impact?.quote]
+    .filter((quote): quote is string => Boolean(quote))
+    .some((quote) => /(?:თრექინგ|ტრექინგ|tracking\s*(?:code|number)|код\s*отслеж)/iu.test(quote)
+      && /(?:არასწორ|შეცდომ|wrong|incorrect|mistake|error|невер|ошиб)/iu.test(quote));
   if (s.focus === 'attribution') {
     const gap = val(s, 'reporting_gap');
     diagnosis = ['none', 'ask'].includes(val(s, 'attribution')) || gap === 'missing'
@@ -80,7 +87,50 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
     next = t('გამოკვეთეთ ერთი ცოცხალი მომსახურების როლი, მისი სამუშაო საათები, ტიპური შემთხვევები და ხარისხის შემოწმების წესი. ეს არ არის ავტომატური ჩატის პილოტი.', 'Опишите одну роль живого сервиса, часы работы, типовые случаи и правило проверки качества. Это не пилот автоматического чата.', 'Define one live-service role, working hours, typical cases and quality-review rule. This is not an automated-chat pilot.');
     metrics = t('დახურული შემთხვევები, პასუხის დრო, ხარისხის შემოწმება და კლიენტის გადაცემა.', 'Закрытые случаи, время ответа, проверка качества и передачи клиенту.', 'Closed cases, response time, quality review and customer handoffs.');
   }
-  if (s.focus === 'chats' && usable(s, 'baseline')) {
+  if (chatsPreparation) {
+    diagnosis = trackingCodeContext ? t(
+      'დაგვიანებული პასუხები და განმეორებადი შემთხვევები AI ჩატის მომზადების შესაძლებლობას აჩვენებს. თრექინგ-კოდის შეცდომის კავშირი სოციალურ ქსელში პასუხთან ჯერ არ დაგვიდასტურებია; თუ ის შეკვეთის ან მიწოდების სხვა ეტაპზე მოხდა, ცალკე მონაცემის სიზუსტის რისკია. ეს შეცდომა თავისთავად არ ადასტურებს, რომ AI ჩატი მას მოაგვარებს.',
+      'Задержки ответов и повторяющиеся случаи указывают на возможность подготовить AI-чат. Связь ошибки с кодом отслеживания с ответом в соцсети пока не подтверждена; если она возникла на другом этапе заказа или доставки, это отдельный риск точности данных. Сама ошибка не доказывает, что AI-чат её устранит.',
+      'Delayed replies and repeatable cases support preparing an AI chat assessment. We have not confirmed whether the tracking-code error happened in a social reply; if it occurred at another order or delivery step, it is a separate data-accuracy risk. The error alone does not show that AI chat will fix it.'
+    ) : t(
+      'დაგვიანებული პასუხები და განმეორებადი შემთხვევები AI ჩატის მომზადების შესაძლებლობას აჩვენებს. ზუსტი სამუშაო ნაბიჯები და საწყისი მაჩვენებლები ჯერ დასადასტურებელია.',
+      'Задержки ответов и повторяющиеся случаи указывают на возможность подготовить AI-чат. Точные шаги работы и исходные показатели ещё нужно подтвердить.',
+      'Delayed replies and repeatable cases support preparing an AI chat assessment. The exact workflow and baseline measures still need confirmation.'
+    );
+    next = trackingCodeContext ? t(
+      'ჯერ არ ჩართოთ ავტომატური გაგზავნა. აირჩიეთ ერთი სოციალური არხი და ანონიმური მაგალითებით აღწერეთ ერთი განმეორებადი პროცესი — ხშირად დასმულ კითხვაზე პასუხი ან შეკვეთისა და თრექინგ-კოდის გადამოწმება. დაადგინეთ, რომელი ცხრილი ან სისტემა არის შეკვეთისა და კოდის სანდო წყარო. პირველ ეტაპზე სისტემა მხოლოდ პასუხის მონახაზს ამზადებს; გაგზავნას ადამიანი ამოწმებს და ამტკიცებს.',
+      'Пока не включайте автоматическую отправку. Выберите один социальный канал и на обезличенных примерах опишите один повторяющийся процесс: ответ на частый вопрос либо проверку заказа и кода отслеживания. Установите, какая таблица или система является достоверным источником заказа и кода. Сначала система только готовит черновик ответа; перед отправкой его проверяет и утверждает человек.',
+      'Do not enable automatic sending yet. Choose one social channel and use anonymized examples to map one repeated task: answering a common question or checking an order and tracking code. Identify the trusted source for order and code data. At first, the system should only draft replies; a person reviews and approves each send.'
+    ) : t(
+      'ჯერ არ ჩართოთ ავტომატური გაგზავნა. აირჩიეთ ერთი სოციალური არხი და ანონიმური მაგალითებით აღწერეთ ერთი განმეორებადი კითხვა ან შეკვეთა. პირველ ეტაპზე სისტემა მხოლოდ პასუხის მონახაზს ამზადებს; გაგზავნას ადამიანი ამოწმებს და ამტკიცებს.',
+      'Пока не включайте автоматическую отправку. Выберите один социальный канал и на обезличенных примерах опишите один повторяющийся вопрос или заказ. Сначала система только готовит черновик ответа; перед отправкой его проверяет и утверждает человек.',
+      'Do not enable automatic sending yet. Choose one social channel and use anonymized examples to map one repeated question or order. At first, the system should only draft replies; a person reviews and approves each send.'
+    );
+    metrics = trackingCodeContext ? t(
+      'საწყისი პასუხის დრო; ადამიანის მიერ შესწორებული ან გადაცემული პასუხების რაოდენობა; არასწორი თრექინგ-კოდის შემთხვევები.',
+      'Время первого ответа; число ответов, исправленных или переданных человеку; случаи отправки неверного кода отслеживания.',
+      'First-response time; replies corrected or handed to a person; incorrect tracking-code cases.'
+    ) : t(
+      'საწყისი პასუხის დრო; ადამიანის მიერ შესწორებული ან გადაცემული პასუხების რაოდენობა; უპასუხოდ დარჩენილი მიმართვები.',
+      'Время первого ответа; число ответов, исправленных или переданных человеку; обращения без ответа.',
+      'First-response time; replies corrected or handed to a person; unanswered enquiries.'
+    );
+    decision = trackingCodeContext ? t(
+      'პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც ზუსტი სამუშაო ნაბიჯები, კოდის სანდო წყარო და საწყისი მაჩვენებლები დადასტურდება. თუ კოდის წყაროს გადამოწმება შეუძლებელია, ეს მოქმედება ადამიანმა უნდა შეასრულოს.',
+      'Переходите к пилоту только после подтверждения точных шагов работы, достоверного источника кода и исходных показателей. Если источник кода нельзя проверить, это действие должен выполнять человек.',
+      'Consider a pilot only after the exact workflow, trusted code source and baseline measures are confirmed. If the code source cannot be verified, keep that action with a person.'
+    ) : t(
+      'პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც ზუსტი სამუშაო ნაბიჯები და საწყისი მაჩვენებლები დადასტურდება.',
+      'Переходите к пилоту только после подтверждения точных шагов работы и исходных показателей.',
+      'Consider a pilot only after the exact workflow and baseline measures are confirmed.'
+    );
+    caution = [
+      trackingCodeContext ? t('თრექინგ-კოდის შეცდომა შეიძლება წყაროს მონაცემში, პროცესში ან მიმღების არჩევაში იყოს; პასუხის ავტომატიზაცია მას თავისთავად არ აგვარებს.', 'Ошибка в коде отслеживания может быть в исходных данных, процессе или выборе получателя; автоматизация ответа сама по себе её не устраняет.', 'A tracking-code error may be in source data, the workflow or recipient selection; automating replies does not fix it by itself.') : '',
+      staffCostContext ? t('ოპერატორის ანაზღაურება ხარჯის კონტექსტია და არა დადასტურებული დანაკარგი ან დაზოგვის პროგნოზი.', 'Оплата оператора — контекст затрат, а не доказанный убыток или прогноз экономии.', 'The operator’s pay is cost context, not a proven loss or savings forecast.') : '',
+      t('გაყიდვების ზრდა არ გამოგვითვლია.', 'Рост продаж не рассчитывался.', 'Sales growth was not calculated.'),
+    ].filter(Boolean).join(' ');
+  }
+  if (s.focus === 'chats' && usable(s, 'baseline') && !chatsPreparation) {
     next = t('შემოიფარგლეთ ერთი არხით და განმეორებადი კითხვებით. შედეგი შეადარეთ თქვენ მიერ დასახელებულ საწყის მაჩვენებელს იმავე პერიოდში და იმავე ტიპის მომართვებისთვის. რთული საკითხი ადამიანს გადაეცეს.', 'Ограничьте проверку одним каналом и повторяющимися вопросами. Сравните результат с указанным вами исходным показателем для того же периода и типа обращений. Сложные вопросы передавайте человеку.', 'Limit the test to one channel and repeated questions. Compare with your stated baseline for the same period and enquiry type. Hand complex questions to a person.');
   }
   if (s.focus === 'growth' && ['reach', 'enquiries'].includes(val(s, 'bottleneck'))) {
@@ -123,12 +173,13 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
     metrics = processMetrics;
     decision = t('ჯერ შეავსეთ ქვემოთ ჩამოთვლილი ინფორმაციის ნაკლებობა. რაოდენობა ან სავარაუდო მოგება არ გამოიგონოთ; განმეორებითი შეფასება რეალურ ჩანაწერებს უნდა დაეყრდნოს.', 'Сначала закройте перечисленные ниже пробелы. Не придумывайте объём или ожидаемую прибыль; повторная оценка должна опираться на реальные записи.', 'Resolve the gaps listed below first. Do not invent volume or expected profit; reassessment must use actual records.');
   }
-  if (a.verdict === 'prepare') {
+  if (a.verdict === 'prepare' && !chatsPreparation) {
     next = t('პილოტი ჯერ არ დაიწყოთ. დანიშნეთ პასუხისმგებელი პირი და გამოყავით დრო შედეგის შესამოწმებლად. მოამზადეთ ნებადართული მაგალითები და შეთანხმდით, რა შეცდომისას შეჩერდება ტესტი. მაღალი რისკის შემთხვევაში საზღვრები შესაბამისმა სპეციალისტმა შეაფასოს.', 'Пока не запускайте пилот. Назначьте ответственного и выделите время на проверку результатов. Подготовьте разрешённые примеры и согласуйте условия остановки при ошибках. При высоком риске границы должен оценить профильный специалист.', 'Do not start a pilot yet. Assign an accountable reviewer and allocate review time. Prepare authorized examples and agree error-based stop conditions. For high-risk work, have an appropriate specialist assess the boundaries.');
     decision = t('ტესტი მხოლოდ მაშინ დაგეგმეთ, როცა მონაცემები, პასუხისმგებელი პირი და შემოწმების წესი მზად იქნება. ეს მზადყოფნა სარგებლის გარანტია არ არის.', 'Планируйте тест только после подготовки данных, ответственного и правил проверки. Готовность не гарантирует полезного результата.', 'Plan a test only when data, ownership and review rules are ready. Readiness does not guarantee a useful outcome.');
   }
-  const gaps = requiredFields(s).filter((f) => !(s.mode === 'deep' ? deepResolved(s,f) : usable(s, f)));
-  const reference = (field: Field, label: string) => usable(s, field) ? `${label}: [${s.facts[field]!.id}] “${s.facts[field]!.quote}”` : '';
+  const gapFields = [...requiredFields(s), ...(s.focus === 'chats' && !usable(s, 'baseline') ? ['baseline' as Field] : [])];
+  const gaps = [...new Set(gapFields)].filter((f) => !(s.mode === 'deep' ? deepResolved(s,f) : usable(s, f)));
+  const reference = (field: Field, label: string) => usable(s, field) ? `${label}: “${s.facts[field]!.quote}”` : '';
   if (s.focus === 'growth' && val(s, 'bottleneck') === 'conversion' && a.verdict !== 'not_now') {
     const renovation = /სარემონტო|რემონტ|ремонт|renovat/iu.test(val(s, 'business'));
     next = t('აიღეთ ბოლო დაკარგული მომართვების მცირე ნიმუში. თითოეულისთვის ჩაიწერეთ: წყარო, მომხმარებლის მოთხოვნა, შეთავაზებული ფასი, უარის ეტაპი, მომხმარებლის ზუსტი სიტყვები და განმეორებითი კონტაქტის შედეგი. უცნობი მიზეზი უცნობად დატოვეთ. პირადი მონაცემები საჭირო არ არის.', 'Разберите небольшую выборку последних потерянных обращений. Для каждого запишите источник, запрос клиента, предложенную цену, этап отказа, дословную причину и результат повторного контакта. Неизвестную причину оставьте неизвестной. Персональные данные не нужны.', 'Review a small sample of recent lost enquiries. Record each source, customer request, offered price, rejection stage, exact objection and follow-up outcome. Leave unknown reasons unknown. No personal details are needed.');
@@ -144,7 +195,7 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
   }
   const actionContext = [
     reference('pain', t('რა უნდა შეიცვალოს', 'Что должно измениться', 'What needs to change')),
-    reference('impact', t('რატომ არის ეს მნიშვნელოვანი', 'Почему это важно', 'Why it matters')),
+    reference('impact', staffCostContext ? t('პერსონალის ხარჯის კონტექსტი', 'Контекст затрат на сотрудника', 'Staff-cost context') : t('რატომ არის ეს მნიშვნელოვანი', 'Почему это важно', 'Why it matters')),
     reference('baseline', t('შედარების საწყისი მაჩვენებელი', 'С чем сравнивать результат', 'Baseline to compare against')),
     a.product ? reference('constraints', t('ადამიანის კონტროლი', 'Граница ответственности человека', 'Human control boundary')) : '',
     a.product ? reference('owner', t('ვინ შეამოწმებს შედეგს', 'Кто проверяет результат', 'Who reviews the result')) : '',
@@ -160,7 +211,7 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
     t('დასკვნა', 'Вывод', 'Conclusion'), findings[a.verdict], diagnosis,
     actionContext,
     `${t('AI შესაძლებლობა', 'Возможность AI', 'AI opportunity')}: ${a.opportunity === 'supported' ? t('დასაბუთებულია ტესტისთვის', 'Обоснована для проверки', 'Supported for testing') : t('დასადასტურებელია', 'Требует подтверждения', 'Needs confirmation')}. ${t('მზადყოფნა', 'Готовность', 'Readiness')}: ${a.readiness === 'ready' ? t('პასუხებით დასტურდება; ინტეგრაცია შესამოწმებელია', 'Подтверждена ответами; интеграцию нужно проверить', 'Supported by answers; integration needs verification') : t('შეზღუდულია ან უცნობია', 'Ограниченная или неизвестная', 'Limited or unknown')}.`,
-    `${t('რეკომენდაცია', 'Рекомендация', 'Recommendation')}: ${a.product ? `${PRODUCT_CATALOG[a.product].name[language]} — ${a.verdict === 'pilot' ? t('მცირე პილოტი, ეფექტის გარანტიის გარეშე', 'небольшой пилот без гарантии эффекта', 'a small pilot without a guaranteed outcome') : PRODUCT_CATALOG[a.product].purpose[language]}` : t('ამ ეტაპზე iAI პროდუქტის შეძენას არ გირჩევთ.', 'На этом этапе покупку продукта iAI не рекомендуем.', 'We do not recommend purchasing an iAI product at this stage.')}`,
+    `${t('რეკომენდაცია', 'Рекомендация', 'Recommendation')}: ${a.product ? `${PRODUCT_CATALOG[a.product].name[language]} — ${chatsPreparation ? t('შესამოწმებელი მიმართულება; ჯერ არ დაიწყოთ პილოტი ან ავტომატური გაგზავნა', 'направление для проверки; пока не начинайте пилот или автоматическую отправку', 'candidate to assess; do not start a pilot or automatic sending yet') : a.verdict === 'pilot' ? t('მცირე პილოტი, ეფექტის გარანტიის გარეშე', 'небольшой пилот без гарантии эффекта', 'a small pilot without a guaranteed outcome') : PRODUCT_CATALOG[a.product].purpose[language]}` : t('ამ ეტაპზე iAI პროდუქტის შეძენას არ გირჩევთ.', 'На этом этапе покупку продукта iAI не рекомендуем.', 'We do not recommend purchasing an iAI product at this stage.')}`,
     t('შემდეგი ნაბიჯი / შემოთავაზებული შემოწმება', 'Следующий шаг / предлагаемая проверка', 'Next step / proposed test'), next,
     t('რა გავზომოთ', 'Что измерить', 'What to measure'), metrics,
     t('როდის გავაგრძელოთ', 'Как принять решение по результату', 'How to decide after the test'),
