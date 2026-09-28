@@ -959,6 +959,182 @@ body.hero-conversation-active .glass-nav.is-top .nav-logo {
   .briefEvidence, .briefActions, .briefDraftNotice { grid-column: 1; }
 }
 
+/* The chat takes ownership of the viewport after the first user message. The
+   page itself is locked by HeroAiChat while this surface is mounted. */
+.heroFirstScreen.heroFullscreenChatMode {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100vw;
+  height: var(--hero-chat-viewport-height, 100dvh);
+  min-height: var(--hero-chat-viewport-height, 100dvh);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+  justify-items: center;
+  padding: max(64px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  background: #faf9f8;
+  overscroll-behavior: none;
+}
+
+.heroFullscreenChatMode .heroConversationMotionWrap {
+  grid-row: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.heroFullscreenChatMode .heroConversationStage {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.heroFullscreenChatMode .heroAiChatWrap {
+  grid-row: 2;
+  width: min(752px, 100%);
+  min-width: 0;
+}
+
+.heroFullscreenChatMode .heroScrollIndicator,
+.heroFullscreenChatMode .heroQuickChips {
+  display: none;
+}
+
+.heroFullscreenChatMode .heroComposer {
+  min-height: 0;
+}
+
+.heroResumeChat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin: 12px auto 0;
+  padding: 0 14px;
+  border: 1px solid #d7dce2;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .86);
+  color: #344154;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.heroResumeChat:hover { background: #fff; border-color: #9fa9b5; }
+.heroResumeChat:focus-visible { outline: 3px solid rgba(79, 70, 229, .24); outline-offset: 3px; }
+
+/* Readable final report: show the decision first, keep evidence available on demand. */
+.heroAuditReport {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  color: #18212f;
+}
+
+.heroAuditReportHeader {
+  padding: 4px 8px 0;
+}
+
+.heroAuditReportEyebrow {
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.heroAuditReportHeader h2 {
+  margin: 4px 0 2px;
+  color: #0f172a;
+  font-size: 21px;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+}
+
+.heroAuditReportHeader p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.heroAuditReportSummary {
+  display: grid;
+  gap: 10px;
+}
+
+.heroAuditSummaryCard {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, .05);
+}
+
+.heroAuditSummaryCard--conclusion {
+  border-color: #c7d2fe;
+  background: linear-gradient(135deg, #eef2ff, #fff 70%);
+}
+
+.heroAuditSummaryCard--next { background: #f8fafc; }
+.heroAuditSummaryCard--measure { background: #fffbeb; border-color: #fde68a; }
+
+.heroAuditSummaryCard > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+.heroAuditReportBody { display: grid; gap: 7px; }
+.heroAuditReportBody p { margin: 0; color: #334155; font-size: 14px; line-height: 1.58; }
+.heroAuditSummaryCard--conclusion .heroAuditReportBody p { color: #1e293b; font-weight: 650; }
+.heroAuditReportBody ul { display: grid; gap: 6px; margin: 0; padding: 0 0 0 18px; color: #334155; font-size: 13px; line-height: 1.55; }
+
+.heroAuditReportDetails {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 4px;
+}
+
+.heroAuditReportDetails > summary,
+.heroAuditReportSection > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  list-style: none;
+}
+
+.heroAuditReportDetails > summary::-webkit-details-marker,
+.heroAuditReportSection > summary::-webkit-details-marker { display: none; }
+.heroAuditReportDetails > summary::after,
+.heroAuditReportSection > summary::after { content: '＋'; color: #94a3b8; font-size: 18px; font-weight: 400; }
+.heroAuditReportDetails[open] > summary::after,
+.heroAuditReportSection[open] > summary::after { content: '−'; }
+.heroAuditReportDetails > summary:focus-visible,
+.heroAuditReportSection > summary:focus-visible { outline: 3px solid rgba(79, 70, 229, .22); outline-offset: 3px; border-radius: 5px; }
+
+.heroAuditReportSections { display: grid; gap: 4px; padding-bottom: 6px; }
+.heroAuditReportSection { border-bottom: 1px solid #eef2f7; }
+.heroAuditReportSection .heroAuditReportBody { padding: 2px 2px 14px; }
+
+@media (max-width: 640px) {
+  .heroFirstScreen.heroFullscreenChatMode {
+    padding-inline: 10px;
+    padding-top: max(56px, env(safe-area-inset-top));
+  }
+  .heroFullscreenChatMode .heroConversationStage { padding-inline: 4px; }
+  .heroAuditReportHeader h2 { font-size: 19px; }
+  .heroAuditSummaryCard { padding: 13px 14px; }
+  .heroAuditSummaryCard .heroAuditReportBody p { font-size: 13.5px; }
+}
+
 /* 4. Scroll Down Indicator */
 .heroScrollIndicator {
   margin-top: 36px;
@@ -1314,4 +1490,68 @@ body.hero-conversation-active aside:has(#analytics-consent-title) {
     font-size: 11px;
     padding: 4px 10px;
   }
+}
+
+/* Final cascade for the fullscreen chat surface. */
+.heroFirstScreen.heroFullscreenChatMode {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100vw;
+  height: var(--hero-chat-viewport-height, 100dvh);
+  min-height: var(--hero-chat-viewport-height, 100dvh);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+  justify-items: center;
+  padding: max(64px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  background: #faf9f8;
+  overscroll-behavior: none;
+}
+.heroFirstScreen.heroFullscreenChatMode .heroConversationMotionWrap { grid-row: 1; min-height: 0; height: 100%; }
+.heroFirstScreen.heroFullscreenChatMode .heroConversationStage { overscroll-behavior: contain; scrollbar-gutter: stable; }
+.heroFirstScreen.heroFullscreenChatMode .heroAiChatWrap { grid-row: 2; width: min(752px, 100%); min-width: 0; }
+.heroFirstScreen.heroFullscreenChatMode .heroScrollIndicator,
+.heroFirstScreen.heroFullscreenChatMode .heroQuickChips { display: none; }
+.heroFirstScreen.heroFullscreenChatMode .heroComposer { min-height: 0; }
+
+@media (max-width: 640px) {
+  .heroFirstScreen.heroFullscreenChatMode {
+    padding-inline: 10px;
+    padding-top: max(56px, env(safe-area-inset-top));
+  }
+  .heroFirstScreen.heroFullscreenChatMode .heroConversationStage { padding-inline: 4px; }
+}
+
+.heroChatActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: min(752px, 100%);
+  margin: 10px auto 0;
+}
+
+.heroChatAction {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #d7dce2;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .9);
+  color: #344154;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.heroChatAction:hover:not(:disabled) { border-color: #9fa9b5; background: #fff; }
+.heroChatAction:disabled { cursor: not-allowed; opacity: .55; }
+.heroChatAction--primary { border-color: #4f46e5; background: #4f46e5; color: #fff; }
+.heroChatAction--primary:hover:not(:disabled) { border-color: #4338ca; background: #4338ca; }
+.heroChatAction:focus-visible { outline: 3px solid rgba(79, 70, 229, .24); outline-offset: 3px; }
+
+@media (max-width: 640px) {
+  .heroChatActions { gap: 6px; margin-top: 8px; }
+  .heroChatAction { min-height: 36px; padding-inline: 11px; font-size: 11.5px; }
 }

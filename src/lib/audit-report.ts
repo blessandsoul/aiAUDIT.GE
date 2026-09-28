@@ -3,9 +3,44 @@ import { assess, requiredFields, deepFieldsFor, deepResolved, usable, val, type 
 import { PRODUCT_CATALOG } from './audit-product-catalog.ts';
 import { DEEP_FIELDS } from './audit-deep-bank.ts';
 
+function buildGrowthNotNowBrief(s: IntakeState, language: Language): string {
+  const t = (ka: string, ru: string, en: string) => l(ka, ru, en)[language];
+  const quote = (field: Field, label: string) => usable(s, field) ? `${label}: “${s.facts[field]!.quote}”` : '';
+  const evidence = [
+    quote('business', t('ბიზნესი', 'Бизнес', 'Business')),
+    quote('objective', t('მიზანი', 'Цель', 'Goal')),
+    quote('bottleneck', t('თქვენი აღწერა', 'Ваше описание', 'Your description')),
+    quote('acquisition', t('მოზიდვის გზა', 'Способ привлечения', 'Acquisition')),
+    quote('severity', t('სიმძიმე', 'Серьёзность', 'Severity')),
+  ].filter(Boolean).join('\n');
+  const priorityNote = val(s, 'priority_check') === 'primary' ? t(
+    'თქვენ მიუთითეთ, რომ ეს ახლა მთავარი პრიორიტეტია. ეს მიზანს ადასტურებს, მაგრამ მცირე სიმძიმის პირობებში ცალკე AI პროექტის დაწყების საფუძველს ჯერ არ ქმნის.',
+    'Вы указали, что это сейчас главный приоритет. Это подтверждает цель, но при небольшой серьёзности пока не создаёт оснований начинать отдельный AI-проект.',
+    'You marked this as the current main priority. That confirms the goal, but with minor severity it still does not support starting a separate AI project.',
+  ) : '';
+  return [
+    'aiAUDIT · Quick Audit',
+    t('მოკლე დასკვნა', 'Краткий вывод', 'Short conclusion'),
+    t('თქვენ აღწერთ მცირე უხერხულობას, რომელსაც ამჟამად უმკლავდებით. ცალკე AI პროექტის დაწყების საფუძველი ჯერ არ დასტურდება.', 'Вы описываете небольшое неудобство, с которым сейчас справляетесь. Оснований начинать отдельный AI-проект пока нет.', 'You describe a minor inconvenience that you currently handle. The answers do not support starting a separate AI project now.'),
+    priorityNote,
+    t('შემდეგი ნაბიჯი — ერთი პრაქტიკული შემოწმება', 'Следующий шаг — одна практическая проверка', 'Next step — one practical check'),
+    t('აირჩიეთ ერთი არხი და შედარებადი ჩვეულებრივი პერიოდები. ჩაიწერეთ სამი ნაბიჯი: ნახვები → მომართვები → შეძენები. შემდეგ შეცვალეთ მხოლოდ ერთი რამ — პოსტის ტექსტი, შეთავაზება ან მოწოდება — და შედეგი შედარებად პერიოდებში შეადარეთ.', 'Выберите один канал и сопоставимые обычные периоды. Запишите три этапа: просмотры → обращения → покупки. Затем измените только один элемент — текст публикации, предложение или призыв — и сравните результат в сопоставимых периодах.', 'Choose one channel and equivalent typical periods. Record three stages: views → enquiries → purchases. Then change one thing only — the post text, offer or call to action — and compare the result across equivalent periods.'),
+    t('რას გავზომავთ', 'Что измерять', 'What to measure'),
+    t('ნახვების, მომართვებისა და შეძენების რაოდენობა.', 'Количество просмотров, обращений и покупок.', 'Counts of views, enquiries and purchases.'),
+    t('როდის დავუბრუნდეთ საკითხს', 'Когда вернуться к вопросу', 'When to revisit'),
+    t('თუ ამ ეტაპზე მომართვების ნაკლებობა განმეორებად და მატერიალურ დანაკარგად იქცევა, ახალი მონაცემებით აუდიტი თავიდან შეაფასეთ.', 'Вернитесь к аудиту с новыми данными, если нехватка обращений станет повторяемой проблемой и ощутимым ущербом.', 'Revisit the audit with new evidence if the low enquiry volume becomes a repeatable and material loss.'),
+    t('მტკიცებულება — თქვენი სიტყვები', 'Основания — ваши слова', 'Evidence — your words'),
+    evidence,
+  ].filter(Boolean).join('\n\n');
+}
+
 export function buildFinalBrief(s: IntakeState, language: Language): string {
   const a = assess(s);
   const t = (ka: string, ru: string, en: string) => l(ka, ru, en)[language];
+  if (s.mode !== 'deep' && s.focus === 'growth' && a.verdict === 'not_now'
+    && val(s, 'severity') === 'minor' && val(s, 'bottleneck') === 'enquiries') {
+    return buildGrowthNotNowBrief(s, language);
+  }
   const evidence = (fields: Field[]) => fields.filter((f) => usable(s, f) || (s.mode === 'deep' && deepResolved(s,f))).map((f) => {
     const fact = s.facts[f]!;
     return `• “${fact.quote}”${fact.status === 'not_applicable' ? t(' — არ ეხება ამ პროცესს', ' — не применимо к этому процессу', ' — not applicable to this process') : fact.status === 'estimated' ? t(' — თქვენი შეფასება', ' — ваша оценка', ' — your estimate') : ''}`;

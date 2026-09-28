@@ -71,6 +71,17 @@ export const deepResolved = (s: IntakeState, f: Field) => usable(s,f) ||
   (['handoff','personal_data','volume_peaks','seasonality','dependencies','error_cost'].includes(f)
     && s.facts[f]?.status === 'not_applicable' && Boolean(s.facts[f]?.quote));
 export function requiredFields(s: IntakeState): Field[] {
+  // Once the respondent has explicitly classified the issue as minor, the
+  // Quick Audit has enough evidence for a conservative no-purchase outcome.
+  // Keep the one priority reconciliation question when it has not yet been
+  // answered, then stop instead of collecting an AI-readiness questionnaire.
+  // If another process is more important, retain one area redirect: a minor
+  // issue in the first process cannot establish that the whole business needs
+  // no AI assessment.
+  if (s.mode !== 'deep' && val(s, 'severity') === 'minor') return [
+    'business', 'objective', 'severity', 'priority_check',
+    ...(val(s, 'priority_check') === 'another' ? ['area' as Field] : []),
+  ];
   const deep = deepFieldsFor(s);
   return [...new Set<Field>([...requiredBase(s).filter(f => f !== 'priority_check'), ...deep, 'priority_check', ...(val(s, 'priority_check') === 'another' ? ['area' as Field] : [])])];
 }
@@ -291,15 +302,24 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
   const required = requiredFields(s);
   const exhausted = finish || s.turn >= auditTurnLimit(s);
   const considered = (f: Field) => settled(s.facts[f]) || (s.asked[f] ?? 0) >= 2;
-  const ready = required.every(considered) && (val(s, 'priority_check') !== 'another' || considered('area'));
+  const ready = required.every(considered)
+    && (val(s, 'priority_check') !== 'another' || considered('area'));
   if (ready || exhausted) {
     s.complete = true; s.stopReason = exhausted || required.some((f) => !(s.mode === 'deep' ? deepResolved(s,f) : usable(s, f))) ? 'limited' : 'enough'; s.currentQuestion = null;
     return s;
   }
   const missing = required.filter((f) => !considered(f));
   const conflict = missing.find((f) => s.facts[f]?.status === 'contradicted' || s.facts[f]?.previous);
-  const diagnosticOrder: Field[] = s.focus === 'growth' && val(s, 'bottleneck') === 'conversion'
-    ? ['lost_case', 'loss_stage', 'loss_reason', 'follow_up', 'acquisition', 'conversion'] : BRANCH_FIELDS[s.focus];
+  const earlyGrowthBottleneck = s.focus === 'growth' && ['reach', 'enquiries'].includes(val(s, 'bottleneck'));
+  // Reach/enquiry audits need an early severity gate. Ask at most one
+  // acquisition or observed-pain probe before it; if the issue is minor,
+  // Quick Audit can stop without forcing conversion and readiness questions.
+  const growthProbeAsked = (s.asked.acquisition ?? 0) > 0 || (s.asked.pain ?? 0) > 0;
+  const earlyGrowthProbe: Field = growthProbeAsked ? 'severity' : usable(s, 'acquisition') ? 'pain' : 'acquisition';
+  const diagnosticOrder: Field[] = earlyGrowthBottleneck
+    ? ['bottleneck', earlyGrowthProbe, 'severity']
+    : s.focus === 'growth' && val(s, 'bottleneck') === 'conversion'
+      ? ['lost_case', 'loss_stage', 'loss_reason', 'follow_up', 'acquisition', 'conversion'] : BRANCH_FIELDS[s.focus];
   const essential = diagnosticOrder.find((f) => missing.includes(f));
   const basics = missing.find((f) => ['business', 'objective'].includes(f));
   let target: Field = basics ?? conflict ?? essential ?? missing[0] ?? 'area';

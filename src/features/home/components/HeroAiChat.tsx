@@ -5,12 +5,14 @@ import { ChannelScannerModal, VoiceIntakeButton } from './intake-tools';
 import { AiIntakeLeadDialog } from './AiIntakeLeadDialog';
 import {
   HeroIntakeConversation,
+  INTAKE_CHAT_COPY,
   type ConversationMessage,
+  type IntakeChatLanguage,
 } from './HeroIntakeConversation';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { MessageSquare, Target, FileText, Zap, ChevronDown } from 'lucide-react';
+import { MessageSquare, Target, FileText, Zap, ChevronDown, X } from 'lucide-react';
 import { BorderBeam } from 'border-beam';
 import type { IntakeState } from '@/lib/ai-intake-controller';
 
@@ -159,12 +161,25 @@ export function HeroAiChat() {
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
   const [heroScrolled, setHeroScrolled] = useState(false);
+  const [chatReady, setChatReady] = useState(false);
   const intakeAbortRef = useRef<AbortController | null>(null);
   const finalAssistantIdRef = useRef<string | null>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composerTopBeforeChatRef = useRef<number | null>(null);
+  const chatScrollPositionRef = useRef(0);
+  const activeElementBeforeChatRef = useRef<HTMLElement | null>(null);
+  const bodyLockStylesRef = useRef<Partial<Record<'position' | 'top' | 'width' | 'overflow' | 'paddingRight', string>>>({});
+  const chatSurfaceRef = useRef<HTMLDivElement>(null);
+  const previousHistoryRef = useRef<{ state: unknown; url: string } | null>(null);
+  const chatHistoryPushedRef = useRef(false);
+  const inertBackgroundRef = useRef<Array<{ element: HTMLElement; inert: boolean; ariaHidden: string | null }>>([]);
+
+  const chatLanguage: IntakeChatLanguage = intakeState?.language ?? 'ka';
+  const chatCopy = INTAKE_CHAT_COPY[chatLanguage];
 
   useEffect(() => {
+    setChatReady(true);
     const onScroll = () => setHeroScrolled(window.scrollY > 30);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -175,15 +190,87 @@ export function HeroAiChat() {
     window.localStorage.removeItem('aiaudit-hero-brief-draft');
   }, []);
 
-  // Keep the page scrollable. The conversation lives in the hero instead of a modal.
+  // The conversation owns the viewport. Save and restore the page scroll position so
+  // leaving the chat returns the visitor to the same place in the landing page.
   useEffect(() => {
-    if (isChatMode) {
-      document.body.classList.add('hero-conversation-active');
-    } else {
-      document.body.classList.remove('hero-conversation-active');
+    const body = document.body;
+    const root = document.documentElement;
+    if (!isChatMode) {
+      body.classList.remove('hero-conversation-active');
+      return;
     }
+
+    chatScrollPositionRef.current = window.scrollY;
+    activeElementBeforeChatRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    bodyLockStylesRef.current = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      paddingRight: body.style.paddingRight,
+    };
+    body.classList.add('hero-conversation-active');
+    body.style.position = 'fixed';
+    body.style.top = `-${chatScrollPositionRef.current}px`;
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+
+    const surface = chatSurfaceRef.current;
+    const backgroundElements = surface ? [
+      ...Array.from(document.querySelectorAll<HTMLElement>('.landing-page > *:not(#hero)')),
+      ...Array.from(document.querySelectorAll<HTMLElement>('header, nav')),
+    ].filter((element, index, all) => all.indexOf(element) === index) : [];
+    inertBackgroundRef.current = backgroundElements.map((element) => {
+      const record = { element, inert: element.inert, ariaHidden: element.getAttribute('aria-hidden') };
+      element.inert = true;
+      element.setAttribute('aria-hidden', 'true');
+      return record;
+    });
+
+    previousHistoryRef.current = { state: window.history.state, url: window.location.href };
+    window.history.pushState({ ...(window.history.state && typeof window.history.state === 'object' ? window.history.state : {}), __aiauditChat: true }, '', window.location.href);
+    chatHistoryPushedRef.current = true;
+    const handlePopState = () => setIsChatMode(false);
+    window.addEventListener('popstate', handlePopState);
+
+    const visualViewport = window.visualViewport;
+    const syncVisualViewport = () => {
+      root.style.setProperty('--hero-chat-viewport-height', `${visualViewport?.height ?? window.innerHeight}px`);
+    };
+    syncVisualViewport();
+    visualViewport?.addEventListener('resize', syncVisualViewport);
+    visualViewport?.addEventListener('scroll', syncVisualViewport);
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      textareaRef.current?.focus({ preventScroll: true });
+    });
+
     return () => {
-      document.body.classList.remove('hero-conversation-active');
+      window.cancelAnimationFrame(focusFrame);
+      visualViewport?.removeEventListener('resize', syncVisualViewport);
+      visualViewport?.removeEventListener('scroll', syncVisualViewport);
+      window.removeEventListener('popstate', handlePopState);
+      for (const record of inertBackgroundRef.current) {
+        record.element.inert = record.inert;
+        if (record.ariaHidden === null) record.element.removeAttribute('aria-hidden');
+        else record.element.setAttribute('aria-hidden', record.ariaHidden);
+      }
+      inertBackgroundRef.current = [];
+      if (chatHistoryPushedRef.current && window.history.state?.__aiauditChat) {
+        const previous = previousHistoryRef.current;
+        if (previous) window.history.replaceState(previous.state, '', previous.url);
+      }
+      chatHistoryPushedRef.current = false;
+      root.style.removeProperty('--hero-chat-viewport-height');
+      body.classList.remove('hero-conversation-active');
+      const styles = bodyLockStylesRef.current;
+      body.style.position = styles.position ?? '';
+      body.style.top = styles.top ?? '';
+      body.style.width = styles.width ?? '';
+      body.style.overflow = styles.overflow ?? '';
+      body.style.paddingRight = styles.paddingRight ?? '';
+      window.scrollTo({ top: chatScrollPositionRef.current, behavior: 'auto' });
+      activeElementBeforeChatRef.current?.focus({ preventScroll: true });
     };
   }, [isChatMode]);
 
@@ -218,6 +305,59 @@ export function HeroAiChat() {
 
   function cancelIntake(): void {
     intakeAbortRef.current?.abort();
+  }
+
+  function exitChatMode(): void {
+    setIsChatMode(false);
+  }
+
+  function handleChatSurfaceKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      exitChatMode();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    )).filter((element) => element.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1)!;
+    if (event.shiftKey && (document.activeElement === first || !event.currentTarget.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function currentReport(): string {
+    return conversation.filter((message) => message.role === 'assistant').at(-1)?.content || '';
+  }
+
+  function downloadReport(): void {
+    const url = URL.createObjectURL(new Blob([currentReport()], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'aiAUDIT-report.txt';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function printReport(): void {
+    const printable = window.open('', '_blank');
+    if (!printable) return;
+    printable.document.title = `aiAUDIT — ${intakeState?.mode === 'deep' ? 'Deep Process Audit' : 'Quick Audit'}`;
+    const style = printable.document.createElement('style');
+    style.textContent = 'body{font:14px/1.6 Arial,sans-serif;margin:36px;color:#10251c}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}';
+    printable.document.head.appendChild(style);
+    const text = printable.document.createElement('pre');
+    text.textContent = currentReport();
+    printable.document.body.appendChild(text);
+    printable.focus();
+    printable.print();
   }
 
   const handleMessageStreamComplete = useCallback((messageId: string): void => {
@@ -334,7 +474,21 @@ export function HeroAiChat() {
   return (
     <>
       {/* 1. HERO VIEW */}
-      <div className={`heroFirstScreen ${isChatMode ? 'heroFirstScreen--conversation' : ''}`}>
+      <div
+        ref={chatSurfaceRef}
+        className={`heroFirstScreen ${isChatMode ? 'heroFirstScreen--conversation heroFullscreenChatMode' : ''}`}
+        role={isChatMode ? 'dialog' : undefined}
+        aria-modal={isChatMode ? 'true' : undefined}
+        aria-label={isChatMode ? chatCopy.chatAria : undefined}
+        tabIndex={isChatMode ? -1 : undefined}
+        onKeyDown={isChatMode ? handleChatSurfaceKeyDown : undefined}
+        data-aiaudit-chat-ready={chatReady ? 'true' : undefined}
+      >
+        {isChatMode ? (
+          <button type="button" className="chatModeExitBtn" onClick={exitChatMode} aria-label={chatCopy.exit} title={chatCopy.exit}>
+            <X size={20} aria-hidden="true" />
+          </button>
+        ) : null}
         <AnimatePresence initial={false}>
           {!isChatMode ? (
             <motion.div
@@ -384,6 +538,7 @@ export function HeroAiChat() {
                 onSuggestion={(suggestion) => void sendIntakeMessage(suggestion)}
                 renderOrb={() => <HeroLiquidOrb accent={orbAccent} />}
                 onMessageStreamComplete={handleMessageStreamComplete}
+                language={chatLanguage}
               />
             </motion.div>
           ) : null}
@@ -425,6 +580,7 @@ export function HeroAiChat() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  ref={textareaRef}
                   rows={2}
                   maxLength={3000}
                   aria-label="თქვენი პასუხი"
@@ -529,6 +685,22 @@ export function HeroAiChat() {
             ) : null}
 
           </div>
+          {intakeState && !intakeState.complete && intakeState.turn >= 5 ? (
+            <div className="heroChatActions">
+              <button type="button" className="heroChatAction" disabled={isIntakeLoading} onClick={() => void sendIntakeMessage(chatCopy.finishPrompt, 'finish')}>
+                {chatCopy.finish}
+              </button>
+            </div>
+          ) : null}
+          {intakeState?.complete ? (
+            <div className="heroChatActions" aria-label={chatCopy.actionsLabel}>
+              <button type="button" className="heroChatAction heroChatAction--primary" onClick={() => setLeadDialogOpen(true)} disabled={leadSubmitted}>
+                {leadSubmitted ? chatCopy.sent : chatCopy.lead}
+              </button>
+              <button type="button" className="heroChatAction" onClick={downloadReport}>{chatCopy.download}</button>
+              <button type="button" className="heroChatAction" onClick={printReport}>{chatCopy.print}</button>
+            </div>
+          ) : null}
         </div>
 
         {/* Scroll Down Hint */}
@@ -543,6 +715,11 @@ export function HeroAiChat() {
               <ChevronDown size={14} className="heroScrollChevron" />
             </button>
           </div>
+        ) : null}
+        {!isChatMode && conversation.length ? (
+          <button type="button" className="heroResumeChat" onClick={() => setIsChatMode(true)}>
+            {chatCopy.resume}
+          </button>
         ) : null}
       </div>
       <ChannelScannerModal
@@ -565,37 +742,6 @@ export function HeroAiChat() {
         </div>)}
         {intakeState.publicScan.observations.map((item, i) => <blockquote key={i}>„{item.quote}“ [{item.sourceId}]</blockquote>)}
       </details>}
-      {intakeState && !intakeState.complete && intakeState.turn >= 5 ? (
-        <div className="heroQuickChips">
-          <button type="button" className="heroChip" disabled={isIntakeLoading} onClick={() => void sendIntakeMessage('მაჩვენეთ დასკვნა არსებული ინფორმაციით.', 'finish')}>
-            დასკვნა არსებული ინფორმაციით
-          </button>
-        </div>
-      ) : null}
-      {intakeState?.complete ? (
-        <div className="heroQuickChips" aria-label="აუდიტის შემდეგი ნაბიჯი">
-          <button type="button" className="heroChip" onClick={() => setLeadDialogOpen(true)} disabled={leadSubmitted}>
-            {leadSubmitted ? 'მოთხოვნა გაგზავნილია' : 'შედეგების განხილვა'}
-          </button>
-          <button type="button" className="heroChip" onClick={() => {
-            const report = conversation.filter((m) => m.role === 'assistant').at(-1)?.content || '';
-            const url = URL.createObjectURL(new Blob([report], { type: 'text/plain;charset=utf-8' }));
-            const link = document.createElement('a'); link.href = url; link.download = 'aiAUDIT-report.txt'; link.click(); URL.revokeObjectURL(url);
-          }}>ანგარიშის ჩამოტვირთვა</button>
-          <button type="button" className="heroChip" onClick={() => {
-            const report = conversation.filter((m) => m.role === 'assistant').at(-1)?.content || '';
-            const printable = window.open('', '_blank');
-            if (!printable) return;
-            printable.document.title = 'aiAUDIT — Quick Audit';
-            const style = printable.document.createElement('style');
-            style.textContent = 'body{font:14px/1.6 Arial,sans-serif;margin:36px;color:#10251c}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}';
-            printable.document.head.appendChild(style);
-            const text = printable.document.createElement('pre'); text.textContent = report;
-            printable.document.body.appendChild(text);
-            printable.focus(); printable.print();
-          }}>PDF / ბეჭდვა</button>
-        </div>
-      ) : null}
       <AiIntakeLeadDialog
         open={leadDialogOpen}
         onOpenChange={setLeadDialogOpen}
