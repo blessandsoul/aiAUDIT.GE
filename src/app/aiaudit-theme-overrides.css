@@ -1,0 +1,24 @@
+.aiaudit-product {
+  --audit-brand: #059669;
+  --audit-accent: #34d399;
+  --audit-soft: #a7f3d0;
+  --primary: #059669;
+  --primary-foreground: #fff;
+  /* Tailwind v4 utilities read these scoped tokens, preserving native variants and opacity. */
+  --color-blue-50: var(--audit-soft); --color-blue-100: var(--audit-soft); --color-blue-200: var(--audit-soft); --color-blue-300: var(--audit-soft); --color-blue-400: var(--audit-soft); --color-blue-500: var(--audit-brand); --color-blue-600: var(--audit-brand); --color-blue-700: var(--audit-brand); --color-blue-800: var(--audit-brand); --color-blue-900: var(--audit-brand); --color-blue-950: var(--audit-brand);
+  --color-indigo-50: var(--audit-soft); --color-indigo-100: var(--audit-soft); --color-indigo-200: var(--audit-soft); --color-indigo-300: var(--audit-soft); --color-indigo-400: var(--audit-soft); --color-indigo-500: var(--audit-brand); --color-indigo-600: var(--audit-brand); --color-indigo-700: var(--audit-brand); --color-indigo-800: var(--audit-brand); --color-indigo-900: var(--audit-brand); --color-indigo-950: var(--audit-brand);
+  --color-purple-50: var(--audit-soft); --color-purple-100: var(--audit-soft); --color-purple-200: var(--audit-soft); --color-purple-300: var(--audit-soft); --color-purple-400: var(--audit-soft); --color-purple-500: var(--audit-brand); --color-purple-600: var(--audit-brand); --color-purple-700: var(--audit-brand); --color-purple-800: var(--audit-brand); --color-purple-900: var(--audit-brand); --color-purple-950: var(--audit-brand);
+  --color-pink-50: var(--audit-soft); --color-pink-100: var(--audit-soft); --color-pink-200: var(--audit-soft); --color-pink-300: var(--audit-soft); --color-pink-400: var(--audit-soft); --color-pink-500: var(--audit-brand); --color-pink-600: var(--audit-brand); --color-pink-700: var(--audit-brand); --color-pink-800: var(--audit-brand); --color-pink-900: var(--audit-brand); --color-pink-950: var(--audit-brand);
+  --color-cyan-50: var(--audit-soft); --color-cyan-100: var(--audit-soft); --color-cyan-200: var(--audit-soft); --color-cyan-300: var(--audit-soft); --color-cyan-400: var(--audit-soft); --color-cyan-500: var(--audit-brand); --color-cyan-600: var(--audit-brand); --color-cyan-700: var(--audit-brand); --color-cyan-800: var(--audit-brand); --color-cyan-900: var(--audit-brand); --color-cyan-950: var(--audit-brand);
+  --color-emerald-50: var(--audit-soft); --color-emerald-100: var(--audit-soft); --color-emerald-200: var(--audit-soft); --color-emerald-300: var(--audit-soft); --color-emerald-400: var(--audit-soft); --color-emerald-500: var(--audit-brand); --color-emerald-600: var(--audit-brand); --color-emerald-700: var(--audit-brand); --color-emerald-800: var(--audit-brand); --color-emerald-900: var(--audit-brand); --color-emerald-950: var(--audit-brand);
+  --color-sky-50: var(--audit-soft); --color-sky-100: var(--audit-soft); --color-sky-200: var(--audit-soft); --color-sky-300: var(--audit-soft); --color-sky-400: var(--audit-soft); --color-sky-500: var(--audit-brand); --color-sky-600: var(--audit-brand); --color-sky-700: var(--audit-brand); --color-sky-800: var(--audit-brand); --color-sky-900: var(--audit-brand); --color-sky-950: var(--audit-brand);
+}
+/* Keep source light accents, but let dark semantic roles win only in their real state. */
+.dark .aiaudit-product [class~="dark:text-white"] { color: #ffffff !important; }
+.dark .aiaudit-product .group:hover [class~="dark:group-hover:text-blue-400"],
+.dark .aiaudit-product .group:hover [class~="dark:group-hover:text-emerald-300"],
+.dark .aiaudit-product .group:hover [class~="dark:group-hover:text-emerald-400"],
+.dark .aiaudit-product .group:hover [class~="dark:group-hover:text-pink-400"],
+.dark .aiaudit-product .group:hover [class~="dark:group-hover:text-purple-400"],
+.dark .aiaudit-product .group\/item:hover [class~="dark:group-hover/item:text-blue-400"] { color: var(--audit-accent) !important; }
+.aiaudit-product .ainow-btn-primary, .aiaudit-product .ainow-model-stage__status { background-color: var(--audit-brand) !important; }

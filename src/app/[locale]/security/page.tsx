@@ -1,53 +1,41 @@
-import type { Metadata } from 'next';
-import { setRequestLocale } from 'next-intl/server';
-import { notFound } from 'next/navigation';
+import type { Metadata } from "next";
+import Link from "next/link";
+import { buildAlternates } from "@/i18n/seo-locales";
+import { previewRobots } from "@/lib/landing-clone-preview";
+import { AiNowDivider } from "@/features/home/components/ainow/AiNowDivider";
+import { AiNowSectionFrame } from "@/features/home/components/ainow/AiNowSectionFrame";
 
-import { PRODUCT_PAGES } from '@/config/product-pages';
-import { PRODUCT_PAGE_LOCALES, type ProductPageLocale } from '@/features/product-pages/types';
-import { getSecurityContent } from '@/features/product-pages/content';
-import { SecurityPage } from '@/features/product-pages/security/SecurityPage';
-import { ProductPageJsonLd } from '@/features/product-pages/components/ProductPageJsonLd';
-import {
-  buildProductPageGraph,
-  buildProductPageMetadata,
-} from '@/features/product-pages/seo';
-
-interface Props {
-  params: Promise<{ locale: string }>;
-}
-
-function asProductPageLocale(locale: string): ProductPageLocale {
-  if (!PRODUCT_PAGE_LOCALES.includes(locale as ProductPageLocale)) notFound();
-  return locale as ProductPageLocale;
-}
+type Props = { params: Promise<{ locale: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return buildProductPageMetadata({
-    locale: asProductPageLocale(locale),
-    namespace: 'productPages.security',
-    path: '/security',
-  });
+  return {
+    title: "Security and human control | aiAUDIT",
+    description: "How aiAUDIT keeps access, evidence and human review visible during a business workflow diagnosis.",
+    alternates: buildAlternates("/security", locale),
+    robots: previewRobots({ index: ["ka", "en", "ru"].includes(locale), follow: true }),
+  };
 }
 
-export default async function ProductSecurityPage({ params }: Props) {
-  if (PRODUCT_PAGES.security.status !== 'public') notFound();
-  const { locale } = await params;
-  const safeLocale = asProductPageLocale(locale);
-  setRequestLocale(safeLocale);
-  const content = await getSecurityContent(safeLocale);
-
+export default function SecurityPage() {
   return (
-    <>
-      <ProductPageJsonLd
-        graph={buildProductPageGraph({
-          locale: safeLocale,
-          path: '/security',
-          name: content.copy.title,
-          description: content.copy.lead,
-        })}
-      />
-      <SecurityPage {...content} />
-    </>
+    <main>
+      <AiNowSectionFrame id="security-intro" className="ainow-blueprint-bg" containerClassName="px-4 py-16 sm:px-6 lg:px-8">
+        <h1 className="font-headline text-3xl font-semibold text-slate-950 dark:text-white sm:text-5xl">Security starts with the boundary</h1>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">aiAUDIT requires an agreed data boundary, names the responsible process owner and keeps uncertain or sensitive decisions with a person. Public copy does not establish certification, runtime coverage or legal compliance.</p>
+      </AiNowSectionFrame>
+      <AiNowDivider />
+      <AiNowSectionFrame id="security-controls" className="ainow-blueprint-bg" containerClassName="px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid gap-4 md:grid-cols-2">
+          {[
+            ["Source access", "Use the minimum agreed material. Private access is never assumed."],
+            ["Actions", "The diagnostic recommends; it does not silently mutate systems or send customer messages."],
+            ["Approval", "A named person validates evidence, scope and the next measurement."],
+            ["Not_now", "Weak fit, insufficient evidence or unacceptable risk can stop the next step."],
+          ].map(([title, body]) => <article key={title} className="dodo-glass-card p-5"><h2 className="font-headline text-xl font-semibold text-slate-950 dark:text-white">{title}</h2><p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{body}</p></article>)}
+        </div>
+        <Link href="/#cta" className="ainow-btn-primary mt-8 inline-flex">Describe a workflow</Link>
+      </AiNowSectionFrame>
+    </main>
   );
 }
