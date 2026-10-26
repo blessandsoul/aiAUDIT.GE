@@ -41,6 +41,17 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
     && val(s, 'severity') === 'minor' && val(s, 'bottleneck') === 'enquiries') {
     return buildGrowthNotNowBrief(s, language);
   }
+  const required = requiredFields(s);
+  const preparationGaps: string[] = [
+    required.includes('process') && !usable(s, 'process') ? t('ზუსტი სამუშაო ნაბიჯები', 'точные шаги работы', 'exact workflow steps') : '',
+    required.includes('impact') && !usable(s, 'impact') ? t('დადასტურებული გავლენა', 'подтверждённое влияние', 'confirmed impact') : '',
+    (required.includes('baseline') || s.focus === 'chats') && !usable(s, 'baseline') ? t('საწყისი მაჩვენებლები', 'исходные показатели', 'baseline measures') : '',
+    required.includes('data') && (!usable(s, 'data') || val(s, 'data') !== 'ready') ? t('მონაცემების მზადყოფნა', 'готовность данных', 'data readiness') : '',
+    required.includes('owner') && (!usable(s, 'owner') || val(s, 'owner') !== 'available') ? t('პასუხისმგებელი პირი', 'ответственный', 'accountability') : '',
+    required.includes('constraints') && (!usable(s, 'constraints') || val(s, 'constraints') === 'high_risk') ? t('ადამიანის კონტროლისა და რისკის საზღვრები', 'границы человеческого контроля и риска', 'human-control and risk boundaries') : '',
+    s.mode === 'deep' && (!usable(s, 'permissions') || val(s, 'permissions') !== 'approved') ? t('მონაცემების გამოყენების ნებართვა', 'разрешение на использование данных', 'permission to use data') : '',
+    s.mode === 'deep' && (!usable(s, 'review_capacity') || val(s, 'review_capacity') !== 'available') ? t('შემმოწმებლისთვის გამოყოფილი დრო', 'выделенное время проверяющего', 'reviewer time allocation') : '',
+  ].filter(Boolean);
   const evidence = (fields: Field[]) => fields.filter((f) => usable(s, f) || (s.mode === 'deep' && deepResolved(s,f))).map((f) => {
     const fact = s.facts[f]!;
     return `• “${fact.quote}”${fact.status === 'not_applicable' ? t(' — არ ეხება ამ პროცესს', ' — не применимо к этому процессу', ' — not applicable to this process') : fact.status === 'estimated' ? t(' — თქვენი შეფასება', ' — ваша оценка', ' — your estimate') : ''}`;
@@ -49,7 +60,9 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
     measurement_first: t('პირველი ნაბიჯი გაზომვის წესისა და წყაროს მონაცემების გამართვაა. მიღებული პასუხები ჯერ არ იძლევა სანდო საფუძველს AI-ით ოპტიმიზაციისთვის.', 'Первый шаг — наладить измерение и исходные данные. Ответы пока не дают надёжной основы для оптимизации с AI.', 'Start with measurement and source data. The answers do not yet establish a reliable basis for AI optimization.'),
     process_first: t('პირველ რიგში არსებული პროცესის ან ჩვეულებრივი ავტომატიზაციის შემოწმებას ვურჩევთ. AI-ის დამატებითი სარგებელი ჯერ დასამტკიცებელია.', 'Сначала стоит проверить изменение процесса или обычную автоматизацию. Дополнительная польза AI пока требует доказательств.', 'First test a process change or conventional automation. The additional benefit of AI still needs evidence.'),
     pilot: t('განმეორებადი სამუშაო, აღწერილი ზიანი და ტესტისთვის მზადყოფნა მცირე AI პილოტის საფუძველს ქმნის. რეალური ეფექტი ტესტმა უნდა აჩვენოს.', 'Повторяемая работа, описанные потери и готовность к проверке дают основание для небольшого AI-пилота. Реальный эффект предстоит измерить.', 'Repeatable work, reported impact and test readiness support a small AI pilot. Its actual benefit must be measured.'),
-    prepare: t('ავტომატიზაციის შესაძლებლობა ჩანს, მაგრამ მონაცემების, პასუხისმგებელი პირის ან რისკის საკითხი ჯერ მოსაგვარებელია.', 'Возможность автоматизации просматривается, но сначала нужно решить вопрос данных, ответственного или риска.', 'There is an automation opportunity, but data, ownership or risk needs attention first.'),
+    prepare: preparationGaps.length
+      ? t(`ავტომატიზაციის შესაძლებლობა ჩანს, მაგრამ პილოტამდე დასაზუსტებელია: ${preparationGaps.join(', ')}.`, `Возможность автоматизации просматривается, но до пилота нужно уточнить: ${preparationGaps.join(', ')}.`, `There is an automation opportunity, but before a pilot clarify: ${preparationGaps.join(', ')}.`)
+      : t('ავტომატიზაციის შესაძლებლობა ჩანს, მაგრამ მცირე შემოწმება ჯერ საჭიროა.', 'Возможность автоматизации просматривается, но сначала нужна небольшая проверка.', 'There is an automation opportunity, but a small check is needed first.'),
     not_now: t('თქვენი პასუხების მიხედვით, ამ პროცესში ცალკე AI პროექტის პრიორიტეტი არ დასტურდება.', 'По вашим ответам приоритет отдельного AI-проекта для этого процесса не подтверждается.', 'Your answers do not support prioritizing a separate AI project for this process.'),
     insufficient: t('ინფორმაცია ჯერ არ არის საკმარისი მიზეზის ან შესაფერისი AI პროდუქტის დასადასტურებლად.', 'Информации пока недостаточно, чтобы подтвердить причину проблемы или подходящий AI-продукт.', 'There is not enough information to confirm the cause or a suitable AI product.'),
     scoped_discovery: t('ამოცანა სპეციფიკური ახალი სისტემის scope-ს ჰგავს. ჯერ საჭიროა ცალკე discovery, სანამ ფუნქციას, ვადას ან ფასს ვიტყვით.', 'Задача похожа на scope новой специализированной системы. Сначала нужен отдельный discovery — до обещаний функций, сроков или цены.', 'This looks like a bespoke new-system scope. A separate discovery is needed before functions, timing or price can be stated.'),
@@ -128,9 +141,9 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
       'Задержки ответов и повторяющиеся случаи указывают на возможность подготовить AI-чат. Связь ошибки с кодом отслеживания с ответом в соцсети пока не подтверждена; если она возникла на другом этапе заказа или доставки, это отдельный риск точности данных. Сама ошибка не доказывает, что AI-чат её устранит.',
       'Delayed replies and repeatable cases support preparing an AI chat assessment. We have not confirmed whether the tracking-code error happened in a social reply; if it occurred at another order or delivery step, it is a separate data-accuracy risk. The error alone does not show that AI chat will fix it.'
     ) : t(
-      'დაგვიანებული პასუხები და განმეორებადი შემთხვევები AI ჩატის მომზადების შესაძლებლობას აჩვენებს. ზუსტი სამუშაო ნაბიჯები და საწყისი მაჩვენებლები ჯერ დასადასტურებელია.',
-      'Задержки ответов и повторяющиеся случаи указывают на возможность подготовить AI-чат. Точные шаги работы и исходные показатели ещё нужно подтвердить.',
-      'Delayed replies and repeatable cases support preparing an AI chat assessment. The exact workflow and baseline measures still need confirmation.'
+      `დაგვიანებული პასუხები და განმეორებადი შემთხვევები AI ჩატის მომზადების შესაძლებლობას აჩვენებს.${preparationGaps.length ? ` პილოტამდე დასაზუსტებელია: ${preparationGaps.join(', ')}.` : ' შემდეგი ნაბიჯი მცირე შემოწმებაა.'}`,
+      `Задержки ответов и повторяющиеся случаи указывают на возможность подготовить AI-чат.${preparationGaps.length ? ` До пилота нужно уточнить: ${preparationGaps.join(', ')}.` : ' Следующий шаг — небольшая проверка.'}`,
+      `Delayed replies and repeatable cases support preparing an AI chat assessment.${preparationGaps.length ? ` Before a pilot clarify: ${preparationGaps.join(', ')}.` : ' The next step is a small check.'}`
     );
     next = trackingCodeContext ? t(
       'ჯერ არ ჩართოთ ავტომატური გაგზავნა. აირჩიეთ ერთი სოციალური არხი და ანონიმური მაგალითებით აღწერეთ ერთი განმეორებადი პროცესი — ხშირად დასმულ კითხვაზე პასუხი ან შეკვეთისა და თრექინგ-კოდის გადამოწმება. დაადგინეთ, რომელი ცხრილი ან სისტემა არის შეკვეთისა და კოდის სანდო წყარო. პირველ ეტაპზე სისტემა მხოლოდ პასუხის მონახაზს ამზადებს; გაგზავნას ადამიანი ამოწმებს და ამტკიცებს.',
@@ -150,14 +163,23 @@ export function buildFinalBrief(s: IntakeState, language: Language): string {
       'Время первого ответа; число ответов, исправленных или переданных человеку; обращения без ответа.',
       'First-response time; replies corrected or handed to a person; unanswered enquiries.'
     );
-    decision = trackingCodeContext ? t(
-      'პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც ზუსტი სამუშაო ნაბიჯები, კოდის სანდო წყარო და საწყისი მაჩვენებლები დადასტურდება. თუ კოდის წყაროს გადამოწმება შეუძლებელია, ეს მოქმედება ადამიანმა უნდა შეასრულოს.',
-      'Переходите к пилоту только после подтверждения точных шагов работы, достоверного источника кода и исходных показателей. Если источник кода нельзя проверить, это действие должен выполнять человек.',
-      'Consider a pilot only after the exact workflow, trusted code source and baseline measures are confirmed. If the code source cannot be verified, keep that action with a person.'
+    const trackingGate = preparationGaps.length ? t(
+      `პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც ${preparationGaps.join(', ')} და კოდის სანდო წყარო დადასტურდება. თუ კოდის წყაროს გადამოწმება შეუძლებელია, ეს მოქმედება ადამიანმა უნდა შეასრულოს.`,
+      `Переходите к пилоту только после уточнения: ${preparationGaps.join(', ')} и достоверного источника кода. Если источник кода нельзя проверить, это действие должен выполнять человек.`,
+      `Consider a pilot only after clarifying: ${preparationGaps.join(', ')} and the trusted code source. If the code source cannot be verified, keep that action with a person.`
     ) : t(
-      'პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც ზუსტი სამუშაო ნაბიჯები და საწყისი მაჩვენებლები დადასტურდება.',
-      'Переходите к пилоту только после подтверждения точных шагов работы и исходных показателей.',
-      'Consider a pilot only after the exact workflow and baseline measures are confirmed.'
+      'პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც კოდის სანდო წყარო დადასტურდება. თუ კოდის წყაროს გადამოწმება შეუძლებელია, ეს მოქმედება ადამიანმა უნდა შეასრულოს.',
+      'Переходите к пилоту только после подтверждения достоверного источника кода. Если источник кода нельзя проверить, это действие должен выполнять человек.',
+      'Consider a pilot only after the trusted code source is confirmed. If the code source cannot be verified, keep that action with a person.'
+    );
+    decision = trackingCodeContext ? trackingGate : preparationGaps.length ? t(
+      `პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც ეს საკითხები დაზუსტდება: ${preparationGaps.join(', ')}.`,
+      `Переходите к пилоту только после уточнения: ${preparationGaps.join(', ')}.`,
+      `Consider a pilot only after clarifying: ${preparationGaps.join(', ')}.`
+    ) : t(
+      'პილოტი განიხილეთ მხოლოდ მას შემდეგ, რაც მცირე შემოწმების წესს შეათანხმებთ.',
+      'Переходите к пилоту только после согласования правил небольшой проверки.',
+      'Consider a pilot only after agreeing the rules for a small check.'
     );
     caution = [
       trackingCodeContext ? t('თრექინგ-კოდის შეცდომა შეიძლება წყაროს მონაცემში, პროცესში ან მიმღების არჩევაში იყოს; პასუხის ავტომატიზაცია მას თავისთავად არ აგვარებს.', 'Ошибка в коде отслеживания может быть в исходных данных, процессе или выборе получателя; автоматизация ответа сама по себе её не устраняет.', 'A tracking-code error may be in source data, the workflow or recipient selection; automating replies does not fix it by itself.') : '',

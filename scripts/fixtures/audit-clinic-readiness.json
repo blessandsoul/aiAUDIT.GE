@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "mode": "quick",
+  "turn": 9,
+  "language": "ka",
+  "focus": "chats",
+  "focusQuote": "Instagram-ში დღეში 200 შეტყობინება გვაქვს. ორი ადმინისტრატორი პასუხობს, ერთი და იგივე ფასსა და ჩაწერაზე კითხულობენ. პასუხი რამდენიმე საათით გვიანდება. გვინდა ადმინისტრატორების დატვირთვის შემცირება.",
+  "facts": {
+    "business": { "id": "business:1", "field": "business", "value": "კერძო კლინიკა", "status": "confirmed", "quote": "კერძო კლინიკა ვართ", "turn": 1 },
+    "customer": { "id": "customer:1", "field": "customer", "value": "პაციენტები", "status": "confirmed", "quote": "პაციენტებს ვემსახურებით", "turn": 1 },
+    "channels": { "id": "channels:1", "field": "channels", "value": "Instagram", "status": "confirmed", "quote": "Instagram-ში დღეში 200 შეტყობინება გვაქვს", "turn": 1 },
+    "scale": { "id": "scale:1", "field": "scale", "value": "დღეში 200 შეტყობინება", "status": "confirmed", "quote": "Instagram-ში დღეში 200 შეტყობინება გვაქვს", "turn": 1 },
+    "process": { "id": "process:1", "field": "process", "value": "ორი ადმინისტრატორი პასუხობს ფასსა და ჩაწერაზე შემოსულ შეტყობინებებს", "status": "confirmed", "quote": "ორი ადმინისტრატორი პასუხობს, ერთი და იგივე ფასსა და ჩაწერაზე კითხულობენ", "turn": 1 },
+    "response": { "id": "response:1", "field": "response", "value": "delays", "status": "confirmed", "quote": "პასუხი რამდენიმე საათით გვიანდება", "turn": 1 },
+    "pain": { "id": "pain:1", "field": "pain", "value": "პასუხი რამდენიმე საათით გვიანდება და ადმინისტრატორები გადატვირთულები არიან", "status": "confirmed", "quote": "პასუხი რამდენიმე საათით გვიანდება. გვინდა ადმინისტრატორების დატვირთვის შემცირება.", "turn": 1 },
+    "objective": { "id": "objective:1", "field": "objective", "value": "ადმინისტრატორების დატვირთვის შემცირება", "status": "confirmed", "quote": "გვინდა ადმინისტრატორების დატვირთვის შემცირება.", "turn": 1 },
+    "repetition": { "id": "repetition:1", "field": "repetition", "value": "repeatable", "status": "confirmed", "quote": "ერთი და იგივე ფასსა და ჩაწერაზე კითხულობენ", "turn": 1 },
+    "area": { "id": "area:1", "field": "area", "value": "chats", "status": "confirmed", "quote": "Instagram-ში დღეში 200 შეტყობინება გვაქვს", "turn": 1 },
+    "systems": { "id": "systems:2", "field": "systems", "value": "Instagram-ის ინბოქსი, კლინიკის ჩაწერის კალენდარი", "status": "confirmed", "quote": "Instagram-ის ინბოქსი და კლინიკის ჩაწერის კალენდარი.", "turn": 2 },
+    "impact": { "id": "impact:3", "field": "impact", "value": "კვირაში 6 საათი იხარჯება და სხვა საქმეები გვიანდება", "status": "confirmed", "quote": "ამ სამუშაოს კვირაში 6 საათს ვხარჯავთ და სხვა საქმე გვიგვიანდება.", "turn": 3 },
+    "severity": { "id": "severity:4", "field": "severity", "value": "material", "status": "confirmed", "quote": "რეგულარულად გვაკარგვინებს დროს ან შესაძლებლობას", "turn": 4 },
+    "data": { "id": "data:5", "field": "data", "value": "ready", "status": "confirmed", "quote": "კი, შეგვიძლია მოვამზადოთ", "turn": 5 },
+    "alternative": { "id": "alternative:6", "field": "alternative", "value": "insufficient", "status": "confirmed", "quote": "ვცადეთ, მაგრამ პრობლემა დარჩა", "turn": 6 },
+    "owner": { "id": "owner:7", "field": "owner", "value": "available", "status": "confirmed", "quote": "პასუხისმგებელი ადამიანი გვყავს", "turn": 7 },
+    "constraints": { "id": "constraints:8", "field": "constraints", "value": "review", "status": "confirmed", "quote": "შედეგს ადამიანი დაამტკიცებს", "turn": 8 },
+    "priority_check": { "id": "priority_check:9", "field": "priority_check", "value": "primary", "status": "confirmed", "quote": "ეს არის მთავარი პრიორიტეტი", "turn": 9 }
+  },
+  "asked": { "systems": 1, "impact": 1, "severity": 1, "data": 1, "alternative": 1, "owner": 1, "constraints": 1, "priority_check": 1 },
+  "currentQuestion": null,
+  "complete": true,
+  "stopReason": "enough",
+  "history": []
+}

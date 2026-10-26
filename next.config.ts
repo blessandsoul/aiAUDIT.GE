@@ -9,6 +9,10 @@ const isLandingClonePreview = !(
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Preserve owner policy and make nested local release builds self-contained.
+  agentRules: false,
+  outputFileTracingRoot: process.cwd(),
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   skipTrailingSlashRedirect: false,
   poweredByHeader: false,
   devIndicators: false,

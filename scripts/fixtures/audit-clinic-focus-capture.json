@@ -1,0 +1,72 @@
+{
+  "input": "კერძო კლინიკა ვართ, პაციენტებს ვემსახურებით. Instagram-ში დღეში 200 შეტყობინება გვაქვს. ორი ადმინისტრატორი პასუხობს, ერთი და იგივე ფასსა და ჩაწერაზე კითხულობენ. პასუხი რამდენიმე საათით გვიანდება. გვინდა ადმინისტრატორების დატვირთვის შემცირება.",
+  "intakeState": {
+    "focus": "discovery",
+    "focusQuote": "",
+    "facts": {
+      "business": {
+        "field": "business",
+        "value": "კერძო კლინიკა",
+        "status": "confirmed",
+        "quote": "კერძო კლინიკა ვართ",
+        "turn": 1
+      },
+      "customer": {
+        "field": "customer",
+        "value": "პაციენტები",
+        "status": "confirmed",
+        "quote": "პაციენტებს ვემსახურებით",
+        "turn": 1
+      },
+      "channels": {
+        "field": "channels",
+        "value": "Instagram",
+        "status": "confirmed",
+        "quote": "Instagram-ში დღეში 200 შეტყობინება გვაქვს",
+        "turn": 1
+      },
+      "scale": {
+        "field": "scale",
+        "value": "დღეში 200 შეტყობინება",
+        "status": "confirmed",
+        "quote": "Instagram-ში დღეში 200 შეტყობინება გვაქვს",
+        "turn": 1
+      },
+      "process": {
+        "field": "process",
+        "value": "ორი ადმინისტრატორი პასუხობს ფასსა და ჩაწერაზე შემოსულ შეტყობინებებს",
+        "status": "confirmed",
+        "quote": "ორი ადმინისტრატორი პასუხობს, ერთი და იგივე ფასსა და ჩაწერაზე კითხულობენ",
+        "turn": 1
+      },
+      "repetition": {
+        "field": "repetition",
+        "value": "repeatable",
+        "status": "confirmed",
+        "quote": "ერთი და იგივე ფასსა და ჩაწერაზე კითხულობენ",
+        "turn": 1
+      },
+      "pain": {
+        "field": "pain",
+        "value": "პასუხი რამდენიმე საათით გვიანდება და ადმინისტრატორები გადატვირთულები არიან",
+        "status": "confirmed",
+        "quote": "პასუხი რამდენიმე საათით გვიანდება",
+        "turn": 1
+      },
+      "response": {
+        "field": "response",
+        "value": "delays",
+        "status": "confirmed",
+        "quote": "პასუხი რამდენიმე საათით გვიანდება",
+        "turn": 1
+      },
+      "objective": {
+        "field": "objective",
+        "value": "ადმინისტრატორების დატვირთვის შემცირება",
+        "status": "confirmed",
+        "quote": "გვინდა ადმინისტრატორების დატვირთვის შემცირება",
+        "turn": 1
+      }
+    }
+  }
+}

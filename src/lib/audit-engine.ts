@@ -183,6 +183,54 @@ export function focusHint(message: string): Focus | null {
   if (/ავტომოპასუხ|автоответчик|auto.?respon(?:der|se)|auto.?reply|automatic repl|social.{0,20}(?:network|media)|სოც(?:იალურ)?\s*ქსელ|(?:instagram|whatsapp|messenger)|ვწერთ|შეტყობინ|сообщен|соцсет|chat/u.test(text)) return 'chats';
   return null;
 }
+function currentTurnQuote(s: IntakeState, field: Field): string {
+  const fact = s.facts[field];
+  return fact && known(fact) && fact.turn === s.turn && fact.quote.trim() ? fact.quote : '';
+}
+function deniedWrittenCommunication(text: string): boolean {
+  const written = '(?:შეტყობინ\\p{L}*|მომართ\\p{L}*|message\\p{L}*|enquir\\p{L}*|chat\\p{L}*|inbox|instagram|whatsapp|messenger|facebook|сообщен\\p{L}*|обращен\\p{L}*)';
+  const denial = '(?:არ|არა|нет|без|no|not|without)';
+  return new RegExp(`${written}[^.!?;]{0,60}(?:^|\\s)${denial}(?=\\s|$|[,.;!?])|(?:^|\\s)${denial}(?=\\s|$|[,.;!?])[^.!?;]{0,60}${written}`, 'iu').test(text);
+}
+function containsCallCommunication(text: string): boolean {
+  return /(?:ზარ\p{L}*|ტელეფონ\p{L}*|call\p{L}*|phone\p{L}*|звон\p{L}*|телефон\p{L}*)/iu.test(text);
+}
+function humanOnlyWrittenProcess(text: string): boolean {
+  return /(?:\b(?:only|just)\s+(?:a\s+)?(?:human|person|specialist)\b|\b(?:human|person|specialist)\s+only\b|must\s+(?:remain|be)\s+(?:human|with a person)|только\s+(?:человек|люд\p{L}*|специалист\p{L}*)|მხოლოდ\s+ადამიან|ადამიან\p{L}*\s+მხოლოდ|ცოცხალ\p{L}*.{0,25}სპეციალისტ)/iu.test(text);
+}
+function writtenRoutingVeto(text: string): boolean {
+  return deniedWrittenCommunication(text) || containsCallCommunication(text) || humanOnlyWrittenProcess(text);
+}
+// A direct process quote may establish Chats only when it describes current
+// written customer handling. Product requests, denials, calls and explicitly
+// human-only work stay out. This helper only returns evidence for routing.
+function currentExplicitChatsProcessQuote(s: IntakeState): string | null {
+  const processQuote = currentTurnQuote(s, 'process');
+  if (!processQuote || focusHint(processQuote) !== 'chats') return null;
+  const evidence = `${processQuote} ${s.history.at(-1)?.content ?? ''}`;
+  if (writtenRoutingVeto(evidence)) return null;
+  if (/(?:გვინდა|მინდა|გვჭირდება|ვყიდ|ვთავაზ|хотим|нужн|прода|предлага|\b(?:sell|selling|need|want|looking for|offer)\b)/iu.test(processQuote)) return null;
+  if (!/(?:პასუხ|კითხ|მომართ|შეტყობინ|reply|respond|answer|question|enquir|обращ|ответ|вопрос|сообщ)/iu.test(processQuote)) return null;
+  return processQuote;
+}
+// Same-turn written-customer routing requires a channel, response, repetition
+// and workflow quote. A channel or product name alone is not a process, and
+// calls mixed with chats remain ambiguous.
+function currentChatsWorkflowQuote(s: IntakeState): string | null {
+  const channelsQuote = currentTurnQuote(s, 'channels');
+  const responseQuote = currentTurnQuote(s, 'response');
+  const repetitionQuote = currentTurnQuote(s, 'repetition');
+  const processQuote = currentTurnQuote(s, 'process');
+  if (!channelsQuote || !responseQuote || !repetitionQuote || !processQuote) return null;
+  if (!['repeatable', 'mixed'].includes(s.facts.repetition!.value)) return null;
+  const evidence = [channelsQuote, responseQuote, repetitionQuote, processQuote].join(' ');
+  const currentMessage = s.history.at(-1)?.content ?? '';
+  const routingEvidence = `${evidence} ${currentMessage}`;
+  if (writtenRoutingVeto(routingEvidence)) return null;
+  if (focusHint(channelsQuote) !== 'chats' || focusHint(evidence) !== 'chats') return null;
+  if (!/(?:პასუხ|კითხ|მომართ|შეტყობინ|reply|respond|answer|question|enquir|обращ|ответ|вопрос|сообщ)/iu.test(processQuote)) return null;
+  return processQuote;
+}
 export function exactChoice(s: IntakeState, message: string): Update | null {
   if (!s.currentQuestion) return null;
   const field = s.currentQuestion, text = message.trim();
@@ -265,9 +313,13 @@ export function advanceAudit(previous: IntakeState, message: string, extraction:
       const docsIndex = candidates.indexOf('docs');
       if (docsIndex !== -1) candidates.splice(docsIndex, 1, 'content');
     }
-    if (processHint && !candidates.length) candidates.push(processHint);
+    const chatsWorkflowQuote = ['discovery', 'operations'].includes(s.focus) ? currentChatsWorkflowQuote(s) : null;
+    const directChatsQuote = ['discovery', 'operations'].includes(s.focus) ? currentExplicitChatsProcessQuote(s) : null;
+    if (processHint && !candidates.length && (processHint !== 'chats' || chatsWorkflowQuote || directChatsQuote)) candidates.push(processHint);
+    if (chatsWorkflowQuote && !candidates.length) candidates.push('chats');
+    if (directChatsQuote && !candidates.length) candidates.push('chats');
     if (new Set(candidates).size === 1) {
-      s.focus = candidates[0]; s.focusQuote = processQuote;
+      s.focus = candidates[0]; s.focusQuote = candidates[0] === 'chats' ? (chatsWorkflowQuote ?? directChatsQuote ?? processQuote) : processQuote;
     }
   }
   // A switch of investigated process invalidates old process-specific evidence.

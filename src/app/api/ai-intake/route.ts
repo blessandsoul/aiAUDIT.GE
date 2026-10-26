@@ -3,6 +3,7 @@ import { extract } from '@/lib/audit-extractor';
 import { advanceAudit, assess, auditTurnLimit, createIntakeState, intakeProgress, languageOf, publicFactSummary, questionFor, type Extraction, type IntakeState } from '@/lib/audit-engine';
 import { buildFinalBrief } from '@/lib/audit-report';
 import { signState, verifyState } from '@/lib/audit-session';
+import { containsSensitiveAuditInput } from '@/lib/audit-input-security';
 import { readAuditBody, AuditRequestTooLarge } from '@/lib/audit-request';
 
 const EMPTY: Extraction = { focus: 'discovery', focusEvidence: '', updates: [], nextField: null };
@@ -13,9 +14,6 @@ function limited(request: NextRequest) {
   const entry = windows.get(ip) || { count: 0, until: now + 60 * 60 * 1000 };
   entry.count++; windows.set(ip, entry);
   return entry.count > 100;
-}
-function sensitive(message: string) {
-  return /(?:sk-[\w-]{16,}|-----BEGIN .*PRIVATE KEY|(?:api[_ -]?key|password|пароль|პაროლი)\s*[:=]\s*\S{6,}|\b\d{13,19}\b)/iu.test(message);
 }
 export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin');
@@ -33,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (previous && input.mode && input.mode !== (previous.mode || 'quick')) return NextResponse.json({error:'Start a new audit to change mode'},{status:409});
     const s = previous || createIntakeState(languageOf(last.content), input.mode === 'deep' ? 'deep' : 'quick');
     if (s.turn >= auditTurnLimit(s) + 6) return NextResponse.json({ error: 'Start a new audit to continue' }, { status: 409 });
-    if (sensitive(last.content)) return NextResponse.json({ error: 'Please remove passwords, keys or payment data and describe only the process.' }, { status: 400 });
+    if (containsSensitiveAuditInput(last.content)) return NextResponse.json({ error: 'Please remove passwords, keys or payment data and describe only the process.' }, { status: 400 });
     const finish = input.action === 'finish';
     const extracted = finish ? EMPTY : await extract(s, last.content, input.thinking === true);
     const next = advanceAudit(s, last.content.trim(), extracted, finish);
